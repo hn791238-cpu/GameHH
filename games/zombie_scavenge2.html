@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8" />
+<title>城市拾荒 · 自动火力版</title>
+<style>
+html,body{margin:0;padding:0;background:#060912;color:#e8ecff;font-family:system-ui}
+canvas{display:block;margin:0 auto;background:#050812}
+#ui{position:fixed;left:50%;transform:translateX(-50%);top:8px;background:rgba(18,26,51,.75);padding:8px 12px;border-radius:10px;font-size:12px}
+#overlay{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.6)}
+#card{background:#0e1430;padding:20px 26px;border-radius:14px;max-width:420px;text-align:center}
+button{padding:8px 14px;border-radius:10px;border:none;cursor:pointer}
+.primary{background:#34d399;color:#062015}
+.danger{background:#ff4d6d;color:#26050b}
+</style>
+</head>
+<body>
+<canvas id="c" width="960" height="540"></canvas>
+<div id="ui"></div>
+<div id="overlay"><div id="card"></div></div>
+<script>
+// ===== 基础 =====
+const canvas=document.getElementById('c');
+const ctx=canvas.getContext('2d');
+const ui=document.getElementById('ui');
+const overlay=document.getElementById('overlay');
+const card=document.getElementById('card');
+const W=2400,H=1600;
+let cam={x:0,y:0};
+const keys=new Set();
+addEventListener('keydown',e=>keys.add(e.key.toLowerCase()));
+addEventListener('keyup',e=>keys.delete(e.key.toLowerCase()));
+
+function clamp(v,a,b){return Math.max(a,Math.min(b,v))}
+function dist2(ax,ay,bx,by){const dx=ax-bx,dy=ay-by;return dx*dx+dy*dy}
+function norm(dx,dy){const d=Math.hypot(dx,dy)||1;return[dx/d,dy/d]}
+
+// ===== 音效（轻量） =====
+const AC=window.AudioContext?new AudioContext():null;
+function beep(f,d=0.05,v=0.03){if(!AC)return;const o=AC.createOscillator();const g=AC.createGain();o.frequency.value=f;o.connect(g);g.connect(AC.destination);g.gain.value=v;o.start();o.stop(AC.currentTime+d)}
+
+// ===== 玩家 =====
+const player={x:W/2,y:H/2,r:12,hp:100,max:100,speed:230,ammo:30,mag:30,reload:0,target:null};
+
+// ===== 世界 =====
+const world={enemies:[],bullets:[],turrets:[],scrap:0,time:0,won:false,endless:false};
+
+// ===== 敌人类型 =====
+const TYPES=[
+ {id:'normal',hp:30,speed:80,dmg:10,w:1},
+ {id:'runner',hp:18,speed:140,dmg:8,w:1.6},
+ {id:'brute',hp:70,speed:45,dmg:18,w:2.2},
+ {id:'swarm',hp:10,speed:95,dmg:6,w:1.2}
+];
+
+function spawnEnemy(){
+ const t=TYPES[Math.floor(Math.random()*TYPES.length)];
+ const edge=Math.random()<0.5?'h':'v';
+ const x=edge==='h'?(Math.random()<0.5?-20:W+20):Math.random()*W;
+ const y=edge==='v'?(Math.random()<0.5?-20:H+20):Math.random()*H;
+ world.enemies.push({x,y,r:10,hp:t.hp,max:t.hp,speed:t.speed,dmg:t.dmg,type:t.id,w:t.w,vx:0,vy:0});
+}
+
+// ===== 炮塔 =====
+function placeTurret(){ if(world.scrap<20) return; world.scrap-=20; world.turrets.push({x:player.x,y:player.y,cd:0}); beep(600); }
+function removeNearestTurret(){ if(!world.turrets.length) return; let i=0,b=1e9; world.turrets.forEach((t,idx)=>{const d=dist2(player.x,player.y,t.x,t.y);if(d<b){b=d;i=idx}}); if(b<260*260){world.turrets.splice(i,1);beep(300);} }
+
+// ===== 自动目标 =====
+function pickTarget(){let best=null,bs=0;for(const e of world.enemies){const d=Math.sqrt(dist2(player.x,player.y,e.x,e.y));if(d>700)continue;const s=e.w/(0.4+d/200);if(s>bs){bs=s;best=e}}return best}
+
+// ===== 更新 =====
+function update(dt){
+ world.time+=dt;
+ if(!world.endless && !world.won && world.time>=180){world.won=true;pauseWin();return}
+
+ // 难度递增
+ const wave=1+Math.floor(world.time/12);
+ const target=8+wave*5;
+ if(world.enemies.length<target) spawnEnemy();
+
+ // 输入
+ const ax=(keys.has('d')||keys.has('arrowright')?1:0)-(keys.has('a')||keys.has('arrowleft')?1:0);
+ const ay=(keys.has('s')||keys.has('arrowdown')?1:0)-(keys.has('w')||keys.has('arrowup')?1:0);
+ if(ax||ay){const[nx,ny]=norm(ax,ay);player.x+=nx*player.speed*dt;player.y+=ny*player.speed*dt}
+ if(keys.has('q')){keys.delete('q');placeTurret()}
+ if(keys.has('x')){keys.delete('x');removeNearestTurret()}
+
+ // 自动射击
+ player.target=pickTarget();
+ if(player.reload>0){player.reload-=dt;if(player.reload<=0){player.ammo=player.mag;beep(400)}}
+ if(player.target && player.reload<=0){
+  if(player.ammo<=0){player.reload=0.8;beep(200)}
+  else{player.ammo--;const[dx,dy]=norm(player.target.x-player.x,player.target.y-player.y);
+   world.bullets.push({x:player.x,y:player.y,vx:dx*700,vy:dy*700,dmg:14});beep(800,0.02,0.02)}
+ }
+
+ // 子弹
+ for(let i=world.bullets.length-1;i>=0;i--){const b=world.bullets[i];b.x+=b.vx*dt;b.y+=b.vy*dt;if(b.x<0||b.y<0||b.x>W||b.y>H){world.bullets.splice(i,1);continue}
+  for(let j=world.enemies.length-1;j>=0;j--){const e=world.enemies[j];if(dist2(b.x,b.y,e.x,e.y)<(e.r*e.r)){
+    e.hp-=b.dmg;const[nx,ny]=norm(b.vx,b.vy);e.vx+=nx*220;e.vy+=ny*220;world.bullets.splice(i,1);
+    if(e.hp<=0){world.enemies.splice(j,1);world.scrap+=Math.random()<0.7?1:0;beep(520)} break;}}
+ }
+
+ // 敌人
+ for(const e of world.enemies){const[nx,ny]=norm(player.x-e.x,player.y-e.y);e.vx+=nx*e.speed*dt;e.vy+=ny*e.speed*dt;e.x+=e.vx*dt;e.y+=e.vy*dt;
+  if(dist2(player.x,player.y,e.x,e.y)<(player.r+e.r)*(player.r+e.r)){player.hp-=e.dmg*dt;if(player.hp<=0){end(false)}}}
+
+ // 炮塔
+ for(const t of world.turrets){t.cd-=dt;if(t.cd<=0){let best=null,bd=1e9;for(const e of world.enemies){const d=dist2(t.x,t.y,e.x,e.y);if(d<bd){bd=d;best=e}}
+  if(best&&bd<600*600){t.cd=0.4;const[nx,ny]=norm(best.x-t.x,best.y-t.y);world.bullets.push({x:t.x,y:t.y,vx:nx*800,vy:ny*800,dmg:8});beep(650,0.015,0.015)}}}
+
+ player.x=clamp(player.x,0,W);player.y=clamp(player.y,0,H);
+ cam.x=clamp(player.x-480,0,W-960);cam.y=clamp(player.y-270,0,H-540);
+}
+
+// ===== 绘制 =====
+function draw(){ctx.clearRect(0,0,960,540);
+ ctx.fillStyle='#050812';ctx.fillRect(0,0,960,540);
+ const tx=-cam.x,ty=-cam.y;
+ // 玩家
+ ctx.fillStyle='#34d399';ctx.beginPath();ctx.arc(player.x+tx,player.y+ty,player.r,0,Math.PI*2);ctx.fill();
+ // 敌人
+ for(const e of world.enemies){ctx.fillStyle='#ffffff22';ctx.beginPath();ctx.arc(e.x+tx,e.y+ty,e.r,0,Math.PI*2);ctx.fill();}
+ // 子弹
+ ctx.fillStyle='#fff';for(const b of world.bullets){ctx.fillRect(b.x+tx,b.y+ty,2,2)}
+ // 炮塔
+ ctx.fillStyle='#7c5cff';for(const t of world.turrets){ctx.beginPath();ctx.arc(t.x+tx,t.y+ty,10,0,Math.PI*2);ctx.fill()}
+ // UI
+ ui.textContent=`HP ${Math.floor(player.hp)} | 弹匣 ${player.ammo}/${player.mag} | 废料 ${world.scrap} | 炮塔 ${world.turrets.length} | 时间 ${Math.floor(world.time)}s`;
+}
+
+function pauseWin(){overlay.style.display='flex';card.innerHTML=`<h2>胜利！</h2><p>你存活了 3 分钟</p><button class='primary' id='c'>继续</button> <button class='danger' id='s'>停止</button>`;
+ document.getElementById('c').onclick=()=>{overlay.style.display='none';world.endless=true};
+ document.getElementById('s').onclick=()=>end(true)}
+function end(win){overlay.style.display='flex';card.innerHTML=`<h2>${win?'结束':'失败'}</h2><p>存活 ${Math.floor(world.time)} 秒</p><button class='primary' onclick='location.reload()'>再来一局</button>`}
+
+let last=performance.now();
+function loop(t){const dt=Math.min(0.033,(t-last)/1000);last=t;if(!overlay.style.display||overlay.style.display==='none')update(dt);draw();requestAnimationFrame(loop)}
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
