@@ -1,0 +1,1347 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>城市拾荒：火力与工匠</title>
+  <style>
+    :root{
+      --bg:#050812;
+      --panel:rgba(18,26,51,.78);
+      --line:#24305e;
+      --text:#e8ecff;
+      --muted:#aab3d6;
+      --accent:#7c5cff;
+      --danger:#ff4d6d;
+      --ok:#34d399;
+      --warn:#fbbf24;
+    }
+    *{ box-sizing: border-box; }
+    body{
+      margin:0;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
+      background:
+        radial-gradient(1100px 600px at 30% -10%, rgba(124,92,255,.25), transparent 60%),
+        radial-gradient(900px 600px at 100% 0%, rgba(52,211,153,.16), transparent 55%),
+        var(--bg);
+      color: var(--text);
+      min-height:100vh;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding: 14px;
+    }
+    .shell{
+      width:min(1100px, 100%);
+      border:1px solid var(--line);
+      border-radius: 18px;
+      overflow:hidden;
+      background: rgba(18,26,51,.45);
+      box-shadow: 0 20px 60px rgba(0,0,0,.45);
+    }
+    .top{
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+      align-items:center;
+      justify-content:space-between;
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--line);
+      background: rgba(255,255,255,.03);
+    }
+    .title{ font-weight:900; font-size: 13px; }
+    .hint{ color: var(--muted); font-size: 12px; line-height:1.4; }
+    .btns{ display:flex; gap:8px; flex-wrap:wrap; }
+    button{
+      border:1px solid var(--line);
+      background: rgba(255,255,255,.04);
+      color: var(--text);
+      padding: 8px 10px;
+      border-radius: 12px;
+      cursor:pointer;
+      font-weight: 700;
+      transition: transform .08s ease, border-color .2s ease, background .2s ease;
+    }
+    button:hover{ border-color: rgba(124,92,255,.7); background: rgba(124,92,255,.10); }
+    button:active{ transform: translateY(1px); }
+    .primary{ border-color: rgba(124,92,255,.75); background: rgba(124,92,255,.16); }
+    .danger{ border-color: rgba(255,77,109,.6); background: rgba(255,77,109,.08); }
+    .danger:hover{ border-color: rgba(255,77,109,.9); background: rgba(255,77,109,.12); }
+
+    .stage{ position:relative; width:100%; }
+    canvas{ display:block; width:100%; height:auto; background: #04060f; }
+
+    .overlay{
+      position:absolute; inset:0;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding: 18px;
+      background: rgba(0,0,0,.55);
+    }
+    .card{
+      width:min(760px, 100%);
+      border:1px solid var(--line);
+      border-radius: 18px;
+      background: rgba(18,26,51,.92);
+      padding: 14px;
+      box-shadow: 0 20px 60px rgba(0,0,0,.6);
+    }
+    .card h1{ margin:0 0 8px; font-size: 18px; }
+    .card h2{ margin:14px 0 8px; font-size: 14px; color: var(--text); }
+    .card p{ margin: 6px 0; color: var(--muted); font-size: 13px; line-height:1.7; }
+    .kbd{ font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      border:1px solid var(--line);
+      background: rgba(255,255,255,.03);
+      padding: 2px 6px;
+      border-radius: 8px;
+      font-size: 12px;
+      color: var(--text);
+      display:inline-block;
+      margin: 0 2px;
+    }
+    .row{
+      display:flex;
+      gap:12px;
+      flex-wrap:wrap;
+      align-items:center;
+      justify-content:space-between;
+      margin-top: 10px;
+    }
+    .pill{
+      font-size: 12px;
+      color: var(--muted);
+      border:1px solid var(--line);
+      background: rgba(255,255,255,.03);
+      padding: 6px 10px;
+      border-radius: 999px;
+    }
+
+    .toast{
+      position:absolute;
+      left: 12px;
+      bottom: 12px;
+      display:flex;
+      flex-direction:column;
+      gap:8px;
+      pointer-events:none;
+    }
+    .toast .item{
+      background: rgba(18,26,51,.86);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 8px 10px;
+      font-size: 12px;
+      color: var(--text);
+      box-shadow: 0 16px 40px rgba(0,0,0,.45);
+    }
+
+    .upgradeGrid{
+      display:grid;
+      grid-template-columns: 1fr;
+      gap: 10px;
+      margin-top: 12px;
+    }
+    @media (min-width: 720px){
+      .upgradeGrid{ grid-template-columns: 1fr 1fr 1fr; }
+    }
+    .upCard{
+      border:1px solid var(--line);
+      background: rgba(255,255,255,.03);
+      border-radius: 14px;
+      padding: 10px;
+      cursor:pointer;
+      transition: transform .08s ease, border-color .2s ease, background .2s ease;
+      min-height: 110px;
+    }
+    .upCard:hover{ border-color: rgba(124,92,255,.7); background: rgba(124,92,255,.10); }
+    .upCard:active{ transform: translateY(1px); }
+    .upTitle{ font-weight: 900; font-size: 13px; }
+    .upDesc{ margin-top:6px; color: var(--muted); font-size: 12px; line-height:1.5; }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <div class="top">
+      <div>
+        <div class="title">城市拾荒：火力与工匠（Roguelike 试玩）</div>
+        <div class="hint" id="miniHelp">
+          移动 <span class="kbd">WASD</span> / 冲刺 <span class="kbd">Shift</span> ｜ 瞄准 <span class="kbd">鼠标</span> / 射击 <span class="kbd">左键</span> / 换弹 <span class="kbd">R</span> ｜ 放陷阱 <span class="kbd">E</span> / 放炮塔 <span class="kbd">Q</span> ｜ 升级选卡 <span class="kbd">1</span><span class="kbd">2</span><span class="kbd">3</span> ｜ 暂停 <span class="kbd">P</span>
+        </div>
+      </div>
+      <div class="btns">
+        <button id="btnHelp">操作说明</button>
+        <button id="btnMute">音效：开</button>
+        <button id="btnRestart" class="danger">重新开始</button>
+      </div>
+    </div>
+
+    <div class="stage">
+      <canvas id="c" width="960" height="540" aria-label="game"></canvas>
+      <div class="toast" id="toast"></div>
+
+      <div class="overlay" id="overlay">
+        <div class="card" id="overlayCard">
+          <h1>目标：在更大的街区里活下去</h1>
+          <p>你可以射击、拾取零件，并在战斗中不断升级。击败“感染者”会掉落材料，材料可以组合成 <b>陷阱</b> 或 <b>机械炮塔</b>。</p>
+          <p><b>胜利条件：</b>收集 <b>12</b> 份补给（医疗/口粮/护盾）并撑过 <b>180 秒</b>。</p>
+          <p><b>小技巧：</b>把战斗引到障碍物附近，先放陷阱再拉怪；炮塔适合守点。</p>
+          <div class="row">
+            <div class="pill">无血腥：只做命中闪光/碎片特效</div>
+            <button id="btnStart" class="primary">开始</button>
+          </div>
+          <p style="margin-top:10px; font-size:12px;">随时按 <span class="kbd">H</span> 重新显示操作提示。</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+  'use strict';
+
+  // ===== Utils =====
+  const clamp = (v,a,b)=>Math.max(a,Math.min(b,v));
+  const lerp = (a,b,t)=>a+(b-a)*t;
+  const rand = (a,b)=>a+Math.random()*(b-a);
+  const randi = (a,b)=>Math.floor(rand(a,b+1));
+  const dist2 = (ax,ay,bx,by)=>{const dx=ax-bx, dy=ay-by; return dx*dx+dy*dy;};
+  const norm = (x,y)=>{const d=Math.hypot(x,y)||1; return [x/d,y/d];};
+
+  // ===== Canvas =====
+  const canvas = document.getElementById('c');
+  const ctx = canvas.getContext('2d');
+  const VIEW_W = 960;
+  const VIEW_H = 540;
+
+  function resizeCanvas(){
+    const dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+    canvas.width = Math.floor(VIEW_W * dpr);
+    canvas.height = Math.floor(VIEW_H * dpr);
+    canvas.style.width = VIEW_W + 'px';
+    canvas.style.height = VIEW_H + 'px';
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+  }
+  resizeCanvas();
+
+  // ===== UI =====
+  const overlay = document.getElementById('overlay');
+  const overlayCard = document.getElementById('overlayCard');
+  const btnStart = document.getElementById('btnStart');
+  const btnRestart = document.getElementById('btnRestart');
+  const btnHelp = document.getElementById('btnHelp');
+  const miniHelp = document.getElementById('miniHelp');
+  const toastEl = document.getElementById('toast');
+  const btnMute = document.getElementById('btnMute');
+
+  function showToast(text){
+    const item = document.createElement('div');
+    item.className = 'item';
+    item.textContent = text;
+    toastEl.prepend(item);
+    while(toastEl.children.length>5) toastEl.removeChild(toastEl.lastChild);
+    setTimeout(()=>{ item.style.opacity='0'; item.style.transform='translateY(4px)'; item.style.transition='all .4s ease'; }, 1400);
+    setTimeout(()=> item.remove(), 1900);
+  }
+
+  // ===== Audio =====
+  let muted = false;
+  const audioCtx = (()=>{ try{ return new (window.AudioContext||window.webkitAudioContext)(); }catch{ return null; }})();
+  function beep(freq=440, duration=0.05, type='sine', gain=0.02){
+    if(muted || !audioCtx) return;
+    const t0 = audioCtx.currentTime;
+    const o = audioCtx.createOscillator();
+    const g = audioCtx.createGain();
+    o.type = type;
+    o.frequency.value = freq;
+    g.gain.value = gain;
+    o.connect(g); g.connect(audioCtx.destination);
+    o.start(t0);
+    o.stop(t0 + duration);
+  }
+
+  // ===== Input =====
+  const keys = new Set();
+  const mouse = {x: VIEW_W/2, y: VIEW_H/2, down:false};
+
+  function canvasPosFromEvent(e){
+    const r = canvas.getBoundingClientRect();
+    const x = (e.clientX - r.left) * (VIEW_W / r.width);
+    const y = (e.clientY - r.top) * (VIEW_H / r.height);
+    return {x, y};
+  }
+
+  window.addEventListener('keydown', (e)=>{
+    const k = e.key.toLowerCase();
+    keys.add(k);
+    if(['arrowup','arrowdown','arrowleft','arrowright',' '].includes(e.key.toLowerCase())) e.preventDefault();
+    if(k==='h') toggleHelp();
+    if(k==='p') togglePause();
+    if(upgradeState.active){
+      if(k==='1') pickUpgrade(0);
+      if(k==='2') pickUpgrade(1);
+      if(k==='3') pickUpgrade(2);
+    }
+  }, {passive:false});
+
+  window.addEventListener('keyup', (e)=>{ keys.delete(e.key.toLowerCase()); });
+  canvas.addEventListener('mousemove', (e)=>{ const p=canvasPosFromEvent(e); mouse.x=p.x; mouse.y=p.y; });
+  canvas.addEventListener('mousedown', ()=>{ mouse.down=true; });
+  window.addEventListener('mouseup', ()=>{ mouse.down=false; });
+
+  // ===== World =====
+  const WORLD = { w: 2400, h: 1600 };
+
+  const world = {
+    obstacles: [],
+    crates: [],
+    loot: [],
+    enemies: [],
+    bullets: [],
+    particles: [],
+    traps: [],
+    turrets: [],
+    timeLeft: 180,
+    goal: 12,
+    collected: 0,
+    wave: 1,
+    spawnTimer: 0,
+  };
+
+  const stats = {
+    dmg: 14,
+    fireRate: 7.0, // shots per sec
+    bulletSpeed: 720,
+    spread: 0.04,
+    magSize: 14,
+    reloadTime: 1.2,
+    moveSpeed: 210,
+    sprintSpeed: 320,
+    maxHP: 100,
+    maxShield: 60,
+    turretDmg: 9,
+    turretRate: 3.5,
+    turretCap: 2,
+    trapDmg: 18,
+    trapCharges: 2,
+    xpGain: 1.0,
+  };
+
+  const player = {
+    x: 400,
+    y: 900,
+    r: 11,
+    vx: 0,
+    vy: 0,
+    hp: 100,
+    shield: 0,
+    stamina: 100,
+    staminaMax: 100,
+    inv: {
+      med: 0,
+      food: 0,
+      cell: 0,
+      ammo: 0,
+      scrap: 0,
+      parts: 0,
+      battery: 0,
+      wire: 0,
+      spring: 0,
+    },
+    gun: {
+      ammo: 14,
+      mag: 14,
+      reload: 0,
+      cd: 0,
+    },
+    xp: 0,
+    lvl: 1,
+    nextXP: 40,
+    hurtCD: 0,
+  };
+
+  const camera = { x: 0, y: 0 };
+
+  function rectsOverlap(a,b){
+    return !(a.x+a.w < b.x || a.x > b.x+b.w || a.y+a.h < b.y || a.y > b.y+b.h);
+  }
+
+  function circleRectCollide(cx,cy,cr, r){
+    const nx = clamp(cx, r.x, r.x+r.w);
+    const ny = clamp(cy, r.y, r.y+r.h);
+    return dist2(cx,cy,nx,ny) <= cr*cr;
+  }
+
+  function resolveCircleRect(ent, r){
+    // simple push-out
+    const nx = clamp(ent.x, r.x, r.x+r.w);
+    const ny = clamp(ent.y, r.y, r.y+r.h);
+    let dx = ent.x - nx;
+    let dy = ent.y - ny;
+    const d2 = dx*dx+dy*dy;
+    if(d2 === 0){
+      // choose smallest axis to push
+      const left = Math.abs(ent.x - r.x);
+      const right = Math.abs(ent.x - (r.x+r.w));
+      const top = Math.abs(ent.y - r.y);
+      const bot = Math.abs(ent.y - (r.y+r.h));
+      const m = Math.min(left,right,top,bot);
+      if(m===left) dx = -1;
+      else if(m===right) dx = 1;
+      else if(m===top) dy = -1;
+      else dy = 1;
+    }
+    const [nxv, nyv] = norm(dx,dy);
+    // move to edge
+    // approximate: step out until no collide
+    for(let i=0;i<6;i++){
+      ent.x += nxv * 1.5;
+      ent.y += nyv * 1.5;
+      if(!circleRectCollide(ent.x, ent.y, ent.r, r)) break;
+    }
+  }
+
+  function clampToWorld(ent){
+    ent.x = clamp(ent.x, ent.r, WORLD.w - ent.r);
+    ent.y = clamp(ent.y, ent.r, WORLD.h - ent.r);
+  }
+
+  function makeObstacles(){
+    const obs = [];
+    const n = 34;
+    let tries = 0;
+    while(obs.length < n && tries < n*40){
+      tries++;
+      const w = rand(70, 180);
+      const h = rand(50, 160);
+      const x = rand(40, WORLD.w - 40 - w);
+      const y = rand(80, WORLD.h - 40 - h);
+      const r = {x,y,w,h};
+      // keep spawn area a bit open
+      if(dist2(x+w/2, y+h/2, 400, 900) < 200*200) continue;
+      let ok = true;
+      for(const o of obs){ if(rectsOverlap({x:x-18,y:y-18,w:w+36,h:h+36}, o)){ ok=false; break; } }
+      if(ok) obs.push(r);
+    }
+    return obs;
+  }
+
+  function makeCrates(){
+    const crates = [];
+    for(let i=0;i<18;i++){
+      let placed = false;
+      for(let t=0;t<120 && !placed;t++){
+        const x = rand(60, WORLD.w-60);
+        const y = rand(110, WORLD.h-60);
+        const r = 12;
+        let ok = true;
+        for(const o of world.obstacles){ if(circleRectCollide(x,y,r,o)){ ok=false; break; } }
+        if(dist2(x,y, player.x, player.y) < 140*140) ok=false;
+        if(ok){ crates.push({x,y,r, open:false}); placed=true; }
+      }
+    }
+    return crates;
+  }
+
+  function spawnEnemy(){
+    // spawn near edges, outside camera
+    const side = randi(0,3);
+    let x=0,y=0;
+    if(side===0){ x = rand(20, WORLD.w-20); y = -40; }
+    if(side===1){ x = WORLD.w+40; y = rand(20, WORLD.h-20); }
+    if(side===2){ x = rand(20, WORLD.w-20); y = WORLD.h+40; }
+    if(side===3){ x = -40; y = rand(20, WORLD.h-20); }
+    const r = rand(11, 16);
+    const base = 70 + world.wave*4;
+    const speed = rand(base, base+35);
+    const hp = Math.round(18 + world.wave*3);
+    world.enemies.push({x,y,r, speed, hp, maxHP:hp, hit:0, slow:0});
+  }
+
+  function spawnLoot(x,y, kind){
+    world.loot.push({x, y, r: 7, kind, t: 0});
+  }
+
+  function spawnBurst(x,y, n=8){
+    for(let i=0;i<n;i++){
+      const a = rand(0, Math.PI*2);
+      const sp = rand(80, 280);
+      world.particles.push({x,y, vx: Math.cos(a)*sp, vy: Math.sin(a)*sp, life: rand(0.18,0.45)});
+    }
+  }
+
+  function reset(){
+    world.obstacles = makeObstacles();
+    world.crates = makeCrates();
+    world.loot = [];
+    world.enemies = [];
+    world.bullets = [];
+    world.particles = [];
+    world.traps = [];
+    world.turrets = [];
+    world.timeLeft = 180;
+    world.goal = 12;
+    world.collected = 0;
+    world.wave = 1;
+    world.spawnTimer = 0;
+
+    player.x = 400;
+    player.y = 900;
+    player.vx = player.vy = 0;
+    player.hp = stats.maxHP;
+    player.shield = Math.min(player.shield, stats.maxShield);
+    player.stamina = player.staminaMax;
+    player.inv = {med:1, food:0, cell:0, ammo: 24, scrap: 2, parts: 0, battery: 0, wire: 0, spring: 0};
+    player.gun.mag = stats.magSize;
+    player.gun.ammo = stats.magSize;
+    player.gun.reload = 0;
+    player.gun.cd = 0;
+    player.xp = 0;
+    player.lvl = 1;
+    player.nextXP = 40;
+    player.hurtCD = 0;
+
+    // initial enemies
+    for(let i=0;i<5;i++) spawnEnemy();
+
+    lastT = performance.now();
+    running = true;
+    paused = false;
+    upgradeState.active = false;
+    overlay.style.display = 'none';
+    showToast('提示：击败敌人会掉材料，升级时选 1/2/3');
+  }
+
+  // ===== Upgrades =====
+  const upgradePool = [
+    {id:'dmg', name:'火力增强', desc:'伤害 +20%', apply:()=>{ stats.dmg = Math.round(stats.dmg*1.2); }},
+    {id:'firerate', name:'快手', desc:'射速 +18%', apply:()=>{ stats.fireRate *= 1.18; }},
+    {id:'mag', name:'扩容弹匣', desc:'弹匣容量 +5', apply:()=>{ stats.magSize += 5; player.gun.mag = stats.magSize; player.gun.ammo = Math.min(player.gun.ammo, stats.magSize); }},
+    {id:'reload', name:'熟练换弹', desc:'换弹更快（-20%）', apply:()=>{ stats.reloadTime *= 0.8; }},
+    {id:'speed', name:'轻装上阵', desc:'移动速度 +12%', apply:()=>{ stats.moveSpeed *= 1.12; stats.sprintSpeed *= 1.10; }},
+    {id:'hp', name:'硬朗体质', desc:'最大生命 +20', apply:()=>{ stats.maxHP += 20; player.hp += 20; }},
+    {id:'shield', name:'护盾模块', desc:'最大护盾 +20', apply:()=>{ stats.maxShield += 20; player.shield += 10; }},
+    {id:'turret', name:'炮塔强化', desc:'炮塔伤害+25% & 射速+12%', apply:()=>{ stats.turretDmg = Math.round(stats.turretDmg*1.25); stats.turretRate *= 1.12; }},
+    {id:'turretcap', name:'工程学：扩建', desc:'可放置炮塔上限 +1', apply:()=>{ stats.turretCap += 1; }},
+    {id:'trap', name:'陷阱改良', desc:'陷阱伤害 +35%', apply:()=>{ stats.trapDmg = Math.round(stats.trapDmg*1.35); }},
+    {id:'trapcharges', name:'陷阱储备', desc:'陷阱触发次数 +1', apply:()=>{ stats.trapCharges += 1; }},
+    {id:'xp', name:'熟练工', desc:'经验获取 +20%', apply:()=>{ stats.xpGain *= 1.2; }},
+  ];
+
+  const upgradeState = {
+    active: false,
+    options: [],
+  };
+
+  function rollUpgrades(){
+    const opts = [];
+    const used = new Set();
+    while(opts.length<3){
+      const u = upgradePool[randi(0, upgradePool.length-1)];
+      if(used.has(u.id)) continue;
+      used.add(u.id);
+      opts.push(u);
+    }
+    return opts;
+  }
+
+  function showUpgradeOverlay(){
+    upgradeState.active = true;
+    upgradeState.options = rollUpgrades();
+
+    overlay.style.display = 'flex';
+    overlayCard.innerHTML = '';
+
+    const h = document.createElement('h1');
+    h.textContent = `升级！选择 1/2/3（等级 ${player.lvl}）`;
+    overlayCard.appendChild(h);
+
+    const p = document.createElement('p');
+    p.textContent = 'Roguelike 三选一：选完立刻继续。';
+    overlayCard.appendChild(p);
+
+    const grid = document.createElement('div');
+    grid.className = 'upgradeGrid';
+
+    upgradeState.options.forEach((u, i)=>{
+      const c = document.createElement('div');
+      c.className = 'upCard';
+      c.tabIndex = 0;
+      c.innerHTML = `<div class="upTitle">${i+1}. ${u.name}</div><div class="upDesc">${u.desc}</div>`;
+      c.addEventListener('click', ()=>pickUpgrade(i));
+      grid.appendChild(c);
+    });
+
+    overlayCard.appendChild(grid);
+
+    const tip = document.createElement('p');
+    tip.style.marginTop = '10px';
+    tip.style.fontSize = '12px';
+    tip.textContent = '提示：炮塔更适合守点；陷阱更适合拉扯。';
+    overlayCard.appendChild(tip);
+  }
+
+  function pickUpgrade(idx){
+    if(!upgradeState.active) return;
+    const u = upgradeState.options[idx];
+    if(!u) return;
+    u.apply();
+    beep(740,0.06,'square',0.02);
+    showToast(`获得升级：${u.name}`);
+    upgradeState.active = false;
+    overlay.style.display = 'none';
+  }
+
+  // ===== Crafting / Placeables =====
+  const recipes = {
+    trap_basic: { needs: {scrap: 1}, name:'简易陷阱' },
+    trap_shock: { needs: {scrap: 1, battery: 1, wire: 1}, name:'电击陷阱' },
+    turret: { needs: {parts: 1, battery: 1, wire: 1, scrap: 1}, name:'机械炮塔' },
+  };
+
+  function hasItems(needs){
+    for(const k in needs){ if((player.inv[k]||0) < needs[k]) return false; }
+    return true;
+  }
+  function spendItems(needs){
+    for(const k in needs){ player.inv[k] -= needs[k]; }
+  }
+
+  function placeTrap(){
+    // prefer shock trap if possible
+    const shock = recipes.trap_shock;
+    const basic = recipes.trap_basic;
+    if(hasItems(shock.needs)){
+      spendItems(shock.needs);
+      world.traps.push({x: player.x, y: player.y, r: 18, dmg: Math.round(stats.trapDmg*1.2), charges: stats.trapCharges, slow: 0.55, kind:'shock'});
+      beep(520,0.05,'triangle',0.02);
+      showToast('放置：电击陷阱');
+      return;
+    }
+    if(hasItems(basic.needs)){
+      spendItems(basic.needs);
+      world.traps.push({x: player.x, y: player.y, r: 16, dmg: stats.trapDmg, charges: stats.trapCharges, slow: 0.35, kind:'basic'});
+      beep(490,0.05,'triangle',0.02);
+      showToast('放置：简易陷阱');
+      return;
+    }
+    showToast('材料不足：需要 Scrap');
+  }
+
+  function placeTurret(){
+    if(world.turrets.length >= stats.turretCap){
+      showToast(`炮塔上限：${stats.turretCap}`);
+      return;
+    }
+    const rec = recipes.turret;
+    if(!hasItems(rec.needs)){
+      showToast('材料不足：Parts + Battery + Wire + Scrap');
+      return;
+    }
+    spendItems(rec.needs);
+    world.turrets.push({x: player.x, y: player.y, r: 14, cd: 0, hp: 999});
+    beep(360,0.05,'square',0.02);
+    showToast('放置：机械炮塔');
+  }
+
+  // ===== Game loop =====
+  let lastT = performance.now();
+  let running = false;
+  let paused = false;
+
+  function togglePause(){
+    if(!running) return;
+    paused = !paused;
+    showToast(paused ? '已暂停' : '继续');
+    beep(paused?260:520,0.04,'sine',0.02);
+  }
+
+  function toggleHelp(){
+    const show = miniHelp.style.display === 'none';
+    miniHelp.style.display = show ? 'block' : 'none';
+  }
+
+  btnHelp.addEventListener('click', ()=>toggleHelp());
+  btnRestart.addEventListener('click', ()=>{ overlay.style.display='flex'; overlayCard.innerHTML = `
+      <h1>重新开始？</h1>
+      <p>会重置本局的升级、材料、炮塔与陷阱。</p>
+      <div class="row">
+        <div class="pill">提示：升级随机三选一</div>
+        <button id="btnGo" class="primary">确认重新开始</button>
+      </div>
+      <p style="margin-top:10px; font-size:12px;">按 <span class="kbd">P</span> 暂停</p>
+    `;
+    overlay.querySelector('#btnGo').addEventListener('click', ()=>reset());
+  });
+
+  btnMute.addEventListener('click', ()=>{
+    muted = !muted;
+    btnMute.textContent = muted ? '音效：关' : '音效：开';
+    if(!muted) beep(520,0.05,'sine',0.02);
+  });
+
+  btnStart.addEventListener('click', ()=>reset());
+
+  function addXP(amount){
+    player.xp += amount * stats.xpGain;
+    if(player.xp >= player.nextXP){
+      player.xp -= player.nextXP;
+      player.lvl += 1;
+      player.nextXP = Math.round(player.nextXP * 1.22 + 8);
+      showUpgradeOverlay();
+    }
+  }
+
+  function damagePlayer(d){
+    if(player.hurtCD>0) return;
+    player.hurtCD = 0.35;
+    let left = d;
+    if(player.shield > 0){
+      const s = Math.min(player.shield, left);
+      player.shield -= s;
+      left -= s;
+    }
+    if(left>0) player.hp -= left;
+    beep(220,0.04,'square',0.03);
+    spawnBurst(player.x, player.y, 8);
+  }
+
+  function shoot(dt){
+    if(player.gun.reload>0) return;
+    if(player.gun.cd>0) return;
+    if(player.gun.ammo<=0) return;
+
+    player.gun.cd = 1 / stats.fireRate;
+    player.gun.ammo -= 1;
+
+    const aimWorldX = camera.x + mouse.x;
+    const aimWorldY = camera.y + mouse.y;
+    const dx = aimWorldX - player.x;
+    const dy = aimWorldY - player.y;
+    let [nx, ny] = norm(dx,dy);
+    const a = Math.atan2(ny,nx) + rand(-stats.spread, stats.spread);
+    nx = Math.cos(a); ny = Math.sin(a);
+
+    const speed = stats.bulletSpeed;
+    world.bullets.push({
+      x: player.x + nx*(player.r+4),
+      y: player.y + ny*(player.r+4),
+      vx: nx*speed,
+      vy: ny*speed,
+      life: 0.95,
+      dmg: stats.dmg,
+    });
+    beep(760,0.02,'square',0.015);
+  }
+
+  function startReload(){
+    if(player.gun.reload>0) return;
+    if(player.gun.ammo >= player.gun.mag) return;
+    if(player.inv.ammo <= 0) { showToast('没有备用弹药'); return; }
+    player.gun.reload = stats.reloadTime;
+    beep(320,0.04,'sine',0.02);
+  }
+
+  function finishReload(){
+    const need = player.gun.mag - player.gun.ammo;
+    const take = Math.min(need, player.inv.ammo);
+    player.inv.ammo -= take;
+    player.gun.ammo += take;
+    showToast(`换弹完成 +${take}`);
+    beep(520,0.03,'sine',0.02);
+  }
+
+  function openCrate(crate){
+    crate.open = true;
+    // drop 2-4 items
+    const drops = randi(2,4);
+    const pool = ['scrap','scrap','wire','battery','parts','spring','ammo','ammo','med','food','cell'];
+    for(let i=0;i<drops;i++){
+      const kind = pool[randi(0,pool.length-1)];
+      spawnLoot(crate.x + rand(-10,10), crate.y + rand(-10,10), kind);
+    }
+    showToast('打开补给箱');
+    beep(420,0.06,'triangle',0.02);
+  }
+
+  function pickLoot(item){
+    const k = item.kind;
+    if(k==='ammo') player.inv.ammo += 8;
+    else if(k==='med') player.inv.med += 1, world.collected += 1;
+    else if(k==='food') player.inv.food += 1, world.collected += 1;
+    else if(k==='cell') player.inv.cell += 1, world.collected += 1;
+    else player.inv[k] += 1;
+
+    // toasts
+    const nameMap = {
+      ammo:'备用弹药', med:'医疗包', food:'口粮', cell:'护盾电池',
+      scrap:'废料', parts:'零件', battery:'电池', wire:'导线', spring:'弹簧'
+    };
+    showToast(`获得：${nameMap[k]||k}`);
+    beep(560,0.03,'sine',0.02);
+  }
+
+  function useConsumable(slot){
+    if(slot===1){
+      if(player.inv.med<=0) { showToast('没有医疗包'); return; }
+      player.inv.med -= 1;
+      player.hp = Math.min(stats.maxHP, player.hp + 40);
+      showToast('使用：医疗包 +40');
+      beep(520,0.05,'sine',0.02);
+      return;
+    }
+    if(slot===2){
+      if(player.inv.food<=0) { showToast('没有口粮'); return; }
+      player.inv.food -= 1;
+      player.stamina = Math.min(player.staminaMax, player.stamina + 55);
+      showToast('使用：口粮 +体力');
+      beep(440,0.05,'sine',0.02);
+      return;
+    }
+    if(slot===3){
+      if(player.inv.cell<=0) { showToast('没有护盾电池'); return; }
+      player.inv.cell -= 1;
+      player.shield = Math.min(stats.maxShield, player.shield + 30);
+      showToast('使用：护盾电池 +30');
+      beep(600,0.05,'sine',0.02);
+      return;
+    }
+  }
+
+  function update(dt){
+    if(!running) return;
+    if(paused) return;
+    if(upgradeState.active) return;
+
+    // timers
+    world.timeLeft -= dt;
+    if(world.timeLeft <= 0){
+      world.timeLeft = 0;
+      checkEnd();
+    }
+
+    // wave scaling
+    const survived = 180 - world.timeLeft;
+    world.wave = 1 + Math.floor(survived / 35);
+
+    // spawn
+    world.spawnTimer -= dt;
+    const targetCount = 6 + world.wave*2;
+    if(world.spawnTimer<=0 && world.enemies.length < targetCount){
+      world.spawnTimer = rand(0.35, 0.8);
+      spawnEnemy();
+    }
+
+    // player hurt cd
+    player.hurtCD = Math.max(0, player.hurtCD - dt);
+
+    // input actions
+    if(keys.has('r')){ startReload(); }
+    if(keys.has('e')){ keys.delete('e'); placeTrap(); }
+    if(keys.has('q')){ keys.delete('q'); placeTurret(); }
+    if(keys.has('1')){ keys.delete('1'); useConsumable(1); }
+    if(keys.has('2')){ keys.delete('2'); useConsumable(2); }
+    if(keys.has('3')){ keys.delete('3'); useConsumable(3); }
+
+    // shooting
+    player.gun.cd = Math.max(0, player.gun.cd - dt);
+    if(mouse.down){ shoot(dt); }
+
+    // reload
+    if(player.gun.reload>0){
+      player.gun.reload -= dt;
+      if(player.gun.reload<=0){ player.gun.reload = 0; finishReload(); }
+    }
+
+    // movement
+    const up = keys.has('w') || keys.has('arrowup');
+    const dn = keys.has('s') || keys.has('arrowdown');
+    const lf = keys.has('a') || keys.has('arrowleft');
+    const rt = keys.has('d') || keys.has('arrowright');
+
+    let ax = (rt?1:0) - (lf?1:0);
+    let ay = (dn?1:0) - (up?1:0);
+    if(ax!==0 || ay!==0){
+      const [nx,ny] = norm(ax,ay);
+      const sprint = keys.has('shift') && player.stamina > 5;
+      const sp = sprint ? stats.sprintSpeed : stats.moveSpeed;
+      player.vx = nx * sp;
+      player.vy = ny * sp;
+      if(sprint){ player.stamina = Math.max(0, player.stamina - 45*dt); }
+      else{ player.stamina = Math.min(player.staminaMax, player.stamina + 26*dt); }
+    }else{
+      player.vx = lerp(player.vx, 0, 0.35);
+      player.vy = lerp(player.vy, 0, 0.35);
+      player.stamina = Math.min(player.staminaMax, player.stamina + 30*dt);
+    }
+
+    player.x += player.vx * dt;
+    player.y += player.vy * dt;
+    clampToWorld(player);
+
+    for(const o of world.obstacles){ if(circleRectCollide(player.x,player.y,player.r,o)) resolveCircleRect(player, o); }
+
+    // open crates
+    for(const c of world.crates){
+      if(c.open) continue;
+      if(dist2(player.x,player.y,c.x,c.y) < (player.r+c.r+6)*(player.r+c.r+6)){
+        openCrate(c);
+      }
+    }
+
+    // pick loot
+    for(let i=world.loot.length-1;i>=0;i--){
+      const it = world.loot[i];
+      it.t += dt;
+      const rr = (player.r + it.r + 6);
+      if(dist2(player.x,player.y,it.x,it.y) < rr*rr){
+        pickLoot(it);
+        world.loot.splice(i,1);
+      }
+    }
+
+    // traps
+    for(let i=world.traps.length-1;i>=0;i--){
+      const tr = world.traps[i];
+      if(tr.charges<=0){ world.traps.splice(i,1); continue; }
+      for(const e of world.enemies){
+        const rr = (tr.r + e.r);
+        if(dist2(tr.x,tr.y,e.x,e.y) < rr*rr){
+          e.hp -= tr.dmg;
+          e.slow = Math.max(e.slow, tr.slow);
+          e.hit = 0.12;
+          tr.charges -= 1;
+          spawnBurst(e.x,e.y,10);
+          beep(280,0.03,'square',0.02);
+          break;
+        }
+      }
+    }
+
+    // turrets
+    for(const t of world.turrets){
+      t.cd = Math.max(0, t.cd - dt);
+      if(t.cd>0) continue;
+      // find nearest
+      let best = null;
+      let bestD2 = 999999999;
+      for(const e of world.enemies){
+        const d2 = dist2(t.x,t.y,e.x,e.y);
+        if(d2 < bestD2){ bestD2 = d2; best = e; }
+      }
+      if(best && bestD2 < 520*520){
+        t.cd = 1 / stats.turretRate;
+        const [nx,ny] = norm(best.x - t.x, best.y - t.y);
+        world.bullets.push({
+          x: t.x + nx*(t.r+4),
+          y: t.y + ny*(t.r+4),
+          vx: nx*(stats.bulletSpeed*0.9),
+          vy: ny*(stats.bulletSpeed*0.9),
+          life: 0.75,
+          dmg: stats.turretDmg,
+          turret: true,
+        });
+        beep(680,0.015,'square',0.012);
+      }
+    }
+
+    // bullets
+    for(let i=world.bullets.length-1;i>=0;i--){
+      const b = world.bullets[i];
+      b.x += b.vx * dt;
+      b.y += b.vy * dt;
+      b.life -= dt;
+      if(b.life<=0 || b.x<-60 || b.y<-60 || b.x>WORLD.w+60 || b.y>WORLD.h+60){
+        world.bullets.splice(i,1); continue;
+      }
+      // obstacle hit
+      let hitObs = false;
+      for(const o of world.obstacles){
+        if(circleRectCollide(b.x,b.y,3,o)) { hitObs=true; break; }
+      }
+      if(hitObs){
+        spawnBurst(b.x,b.y,5);
+        world.bullets.splice(i,1); continue;
+      }
+      // enemy hit
+      for(let j=world.enemies.length-1;j>=0;j--){
+        const e = world.enemies[j];
+        const rr = e.r + 4;
+        if(dist2(b.x,b.y,e.x,e.y) < rr*rr){
+          e.hp -= b.dmg;
+          e.hit = 0.12;
+          spawnBurst(b.x,b.y,6);
+          world.bullets.splice(i,1);
+          if(e.hp<=0){
+            killEnemy(e);
+            world.enemies.splice(j,1);
+          }
+          break;
+        }
+      }
+    }
+
+    // enemies
+    for(const e of world.enemies){
+      e.hit = Math.max(0, e.hit - dt);
+      e.slow = Math.max(0, e.slow - dt*0.6);
+      const sp = e.speed * (e.slow>0 ? (1 - e.slow) : 1);
+      const [nx,ny] = norm(player.x - e.x, player.y - e.y);
+      e.x += nx * sp * dt;
+      e.y += ny * sp * dt;
+      // collisions
+      clampToWorld(e);
+      for(const o of world.obstacles){ if(circleRectCollide(e.x,e.y,e.r,o)) resolveCircleRect(e, o); }
+      // bite
+      const rr = (player.r + e.r + 2);
+      if(dist2(player.x,player.y,e.x,e.y) < rr*rr){
+        damagePlayer(10);
+      }
+    }
+
+    // particles
+    for(let i=world.particles.length-1;i>=0;i--){
+      const p = world.particles[i];
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+      p.vx *= Math.pow(0.02, dt);
+      p.vy *= Math.pow(0.02, dt);
+      p.life -= dt;
+      if(p.life<=0) world.particles.splice(i,1);
+    }
+
+    // camera follow
+    camera.x = clamp(player.x - VIEW_W/2, 0, WORLD.w - VIEW_W);
+    camera.y = clamp(player.y - VIEW_H/2, 0, WORLD.h - VIEW_H);
+
+    checkEnd();
+  }
+
+  function killEnemy(e){
+    beep(240,0.02,'square',0.02);
+    addXP(12);
+    // drop loot
+    const table = [
+      ['scrap',0.35], ['wire',0.18], ['battery',0.12], ['parts',0.10], ['spring',0.10],
+      ['ammo',0.38], ['med',0.10], ['food',0.10], ['cell',0.08]
+    ];
+    // 1-2 drops
+    const drops = Math.random()<0.28 ? 2 : 1;
+    for(let i=0;i<drops;i++){
+      const r = Math.random();
+      let acc = 0;
+      for(const [k,p] of table){
+        acc += p;
+        if(r <= acc){ spawnLoot(e.x + rand(-8,8), e.y + rand(-8,8), k); break; }
+      }
+    }
+  }
+
+  function checkEnd(){
+    if(player.hp <= 0){
+      endGame(false, '你倒下了（本局结束）');
+      return;
+    }
+    if(world.timeLeft <= 0){
+      const win = world.collected >= world.goal;
+      endGame(win, win ? '你撑过了夜晚并带走了足够补给！' : '时间到，但补给不足');
+      return;
+    }
+  }
+
+  function endGame(win, msg){
+    running = false;
+    overlay.style.display = 'flex';
+    overlayCard.innerHTML = `
+      <h1>${win ? '胜利！' : '失败'}</h1>
+      <p>${msg}</p>
+      <p><b>本局数据：</b>等级 ${player.lvl} ｜ 补给 ${world.collected}/${world.goal} ｜ 波次 ${world.wave}</p>
+      <div class="row">
+        <div class="pill">想更爽：堆火力 + 守点炮塔</div>
+        <button id="btnAgain" class="primary">再来一局</button>
+      </div>
+      <p style="margin-top:10px; font-size:12px;">提示：按 <span class="kbd">E</span>/<span class="kbd">Q</span> 放置装置</p>
+    `;
+    overlay.querySelector('#btnAgain').addEventListener('click', ()=>reset());
+  }
+
+  function draw(){
+    // background
+    ctx.clearRect(0,0,VIEW_W,VIEW_H);
+
+    // grid backdrop
+    ctx.fillStyle = '#050812';
+    ctx.fillRect(0,0,VIEW_W,VIEW_H);
+    const gx = - (camera.x % 40);
+    const gy = - (camera.y % 40);
+    ctx.globalAlpha = 0.10;
+    ctx.strokeStyle = '#aab3d6';
+    ctx.lineWidth = 1;
+    for(let x=gx; x<VIEW_W; x+=40){
+      ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,VIEW_H); ctx.stroke();
+    }
+    for(let y=gy; y<VIEW_H; y+=40){
+      ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(VIEW_W,y); ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+
+    // translate world->view
+    const tx = -camera.x;
+    const ty = -camera.y;
+
+    // obstacles
+    for(const o of world.obstacles){
+      const x = o.x+tx, y=o.y+ty;
+      if(x>VIEW_W||y>VIEW_H||x+o.w<0||y+o.h<0) continue;
+      ctx.fillStyle = 'rgba(124,92,255,.12)';
+      ctx.fillRect(x,y,o.w,o.h);
+      ctx.strokeStyle = 'rgba(124,92,255,.35)';
+      ctx.strokeRect(x+0.5,y+0.5,o.w-1,o.h-1);
+    }
+
+    // crates
+    for(const c of world.crates){
+      const x = c.x+tx, y=c.y+ty;
+      if(x<-30||y<-30||x>VIEW_W+30||y>VIEW_H+30) continue;
+      ctx.fillStyle = c.open ? 'rgba(255,255,255,.06)' : 'rgba(52,211,153,.10)';
+      ctx.beginPath(); ctx.arc(x,y,c.r,0,Math.PI*2); ctx.fill();
+      ctx.strokeStyle = c.open ? 'rgba(170,179,214,.25)' : 'rgba(52,211,153,.45)';
+      ctx.stroke();
+    }
+
+    // traps
+    for(const tr of world.traps){
+      const x=tr.x+tx,y=tr.y+ty;
+      ctx.globalAlpha = 0.85;
+      ctx.strokeStyle = tr.kind==='shock' ? 'rgba(251,191,36,.9)' : 'rgba(255,255,255,.7)';
+      ctx.fillStyle = tr.kind==='shock' ? 'rgba(251,191,36,.10)' : 'rgba(255,255,255,.07)';
+      ctx.beginPath(); ctx.arc(x,y,tr.r,0,Math.PI*2); ctx.fill(); ctx.stroke();
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = 'rgba(170,179,214,.85)';
+      ctx.font = '11px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace';
+      ctx.fillText(String(tr.charges), x-3, y+4);
+    }
+
+    // turrets
+    for(const t of world.turrets){
+      const x=t.x+tx,y=t.y+ty;
+      ctx.fillStyle = 'rgba(124,92,255,.22)';
+      ctx.beginPath(); ctx.arc(x,y,t.r,0,Math.PI*2); ctx.fill();
+      ctx.strokeStyle = 'rgba(124,92,255,.65)';
+      ctx.stroke();
+      ctx.fillStyle = 'rgba(255,255,255,.85)';
+      ctx.beginPath(); ctx.arc(x,y,3,0,Math.PI*2); ctx.fill();
+    }
+
+    // loot
+    const lootColor = (k)=>{
+      if(k==='med') return 'rgba(52,211,153,.90)';
+      if(k==='food') return 'rgba(251,191,36,.90)';
+      if(k==='cell') return 'rgba(124,92,255,.90)';
+      if(k==='ammo') return 'rgba(255,255,255,.85)';
+      if(k==='parts') return 'rgba(124,92,255,.85)';
+      return 'rgba(170,179,214,.85)';
+    };
+    for(const it of world.loot){
+      const x=it.x+tx,y=it.y+ty;
+      if(x<-20||y<-20||x>VIEW_W+20||y>VIEW_H+20) continue;
+      ctx.fillStyle = lootColor(it.kind);
+      ctx.beginPath(); ctx.arc(x,y,it.r,0,Math.PI*2); ctx.fill();
+      ctx.globalAlpha = 0.35;
+      ctx.strokeStyle = lootColor(it.kind);
+      ctx.beginPath(); ctx.arc(x,y,it.r+5+Math.sin(it.t*6)*1.5,0,Math.PI*2); ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+
+    // enemies
+    for(const e of world.enemies){
+      const x=e.x+tx,y=e.y+ty;
+      if(x<-40||y<-40||x>VIEW_W+40||y>VIEW_H+40) continue;
+      ctx.fillStyle = e.hit>0 ? 'rgba(255,77,109,.85)' : 'rgba(255,77,109,.55)';
+      ctx.beginPath(); ctx.arc(x,y,e.r,0,Math.PI*2); ctx.fill();
+      // eye dot
+      ctx.fillStyle = 'rgba(255,255,255,.85)';
+      ctx.beginPath(); ctx.arc(x+e.r*0.25,y-e.r*0.1,2,0,Math.PI*2); ctx.fill();
+    }
+
+    // bullets
+    for(const b of world.bullets){
+      const x=b.x+tx,y=b.y+ty;
+      ctx.fillStyle = b.turret ? 'rgba(124,92,255,.95)' : 'rgba(255,255,255,.9)';
+      ctx.beginPath(); ctx.arc(x,y,2.3,0,Math.PI*2); ctx.fill();
+    }
+
+    // particles
+    ctx.globalAlpha = 0.7;
+    ctx.fillStyle = 'rgba(170,179,214,.9)';
+    for(const p of world.particles){
+      const x=p.x+tx,y=p.y+ty;
+      ctx.fillRect(x,y,2,2);
+    }
+    ctx.globalAlpha = 1;
+
+    // player
+    {
+      const x=player.x+tx,y=player.y+ty;
+      ctx.fillStyle = 'rgba(52,211,153,.30)';
+      ctx.beginPath(); ctx.arc(x,y,player.r+4,0,Math.PI*2); ctx.fill();
+
+      ctx.fillStyle = 'rgba(52,211,153,.92)';
+      ctx.beginPath(); ctx.arc(x,y,player.r,0,Math.PI*2); ctx.fill();
+
+      // aim line
+      const ax = camera.x + mouse.x;
+      const ay = camera.y + mouse.y;
+      const [nx,ny] = norm(ax - player.x, ay - player.y);
+      ctx.strokeStyle = 'rgba(255,255,255,.28)';
+      ctx.beginPath();
+      ctx.moveTo(x,y);
+      ctx.lineTo(x+nx*28,y+ny*28);
+      ctx.stroke();
+    }
+
+    // crosshair
+    {
+      const cx = mouse.x;
+      const cy = mouse.y;
+      ctx.strokeStyle = 'rgba(255,255,255,.45)';
+      ctx.beginPath();
+      ctx.arc(cx,cy,7,0,Math.PI*2);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(cx-11,cy); ctx.lineTo(cx-4,cy);
+      ctx.moveTo(cx+4,cy); ctx.lineTo(cx+11,cy);
+      ctx.moveTo(cx,cy-11); ctx.lineTo(cx,cy-4);
+      ctx.moveTo(cx,cy+4); ctx.lineTo(cx,cy+11);
+      ctx.stroke();
+    }
+
+    // HUD
+    drawHUD();
+    drawMinimap();
+  }
+
+  function drawBar(x,y,w,h, pct, col, back='rgba(255,255,255,.10)'){
+    ctx.fillStyle = back;
+    ctx.fillRect(x,y,w,h);
+    ctx.fillStyle = col;
+    ctx.fillRect(x,y,w*clamp(pct,0,1),h);
+    ctx.strokeStyle = 'rgba(36,48,94,.9)';
+    ctx.strokeRect(x+0.5,y+0.5,w-1,h-1);
+  }
+
+  function drawHUD(){
+    const pad = 10;
+    const x = pad;
+    const y = pad;
+
+    // HP / Shield / Stamina
+    drawBar(x, y, 220, 10, player.hp / stats.maxHP, 'rgba(52,211,153,.85)');
+    drawBar(x, y+14, 220, 10, player.shield / Math.max(1,stats.maxShield), 'rgba(124,92,255,.85)');
+    drawBar(x, y+28, 220, 10, player.stamina / player.staminaMax, 'rgba(251,191,36,.85)');
+
+    ctx.fillStyle = 'rgba(232,236,255,.92)';
+    ctx.font = '12px ui-sans-serif, system-ui';
+    ctx.fillText(`HP ${Math.max(0,Math.round(player.hp))}/${stats.maxHP}`, x, y+54);
+    ctx.fillText(`护盾 ${Math.round(player.shield)}/${stats.maxShield}`, x+112, y+54);
+
+    // ammo
+    const aX = x;
+    const aY = y+66;
+    ctx.fillStyle = 'rgba(232,236,255,.92)';
+    ctx.fillText(`弹匣 ${player.gun.ammo}/${player.gun.mag}  备用 ${player.inv.ammo}`, aX, aY);
+    if(player.gun.reload>0){
+      ctx.fillStyle = 'rgba(251,191,36,.95)';
+      ctx.fillText(`换弹中...`, aX+170, aY);
+    }
+
+    // objective + time
+    const t = Math.ceil(world.timeLeft);
+    const mm = String(Math.floor(t/60)).padStart(2,'0');
+    const ss = String(t%60).padStart(2,'0');
+    ctx.fillStyle = 'rgba(232,236,255,.92)';
+    ctx.fillText(`补给 ${world.collected}/${world.goal}  |  波次 ${world.wave}  |  剩余 ${mm}:${ss}`, x, aY+18);
+
+    // xp
+    const xpPct = player.xp / player.nextXP;
+    drawBar(x, aY+26, 220, 8, xpPct, 'rgba(124,92,255,.7)', 'rgba(255,255,255,.06)');
+    ctx.fillStyle = 'rgba(170,179,214,.95)';
+    ctx.font = '11px ui-sans-serif, system-ui';
+    ctx.fillText(`Lv.${player.lvl}  XP ${Math.round(player.xp)}/${player.nextXP}`, x, aY+46);
+
+    // inventory mini
+    const invLine = `废料${player.inv.scrap} 零件${player.inv.parts} 电池${player.inv.battery} 导线${player.inv.wire} 弹簧${player.inv.spring}  |  炮塔${world.turrets.length}/${stats.turretCap}`;
+    ctx.fillStyle = 'rgba(170,179,214,.92)';
+    ctx.fillText(invLine, x, aY+64);
+
+    // hint
+    ctx.fillStyle = 'rgba(170,179,214,.72)';
+    ctx.fillText('E 放陷阱 / Q 放炮塔 / 1-3 用补给 / P 暂停', x, VIEW_H-12);
+  }
+
+  function drawMinimap(){
+    const w = 170;
+    const h = 112;
+    const x0 = VIEW_W - w - 10;
+    const y0 = 10;
+
+    ctx.fillStyle = 'rgba(18,26,51,.55)';
+    ctx.fillRect(x0,y0,w,h);
+    ctx.strokeStyle = 'rgba(36,48,94,.9)';
+    ctx.strokeRect(x0+0.5,y0+0.5,w-1,h-1);
+
+    const sx = w / WORLD.w;
+    const sy = h / WORLD.h;
+
+    // camera rect
+    ctx.strokeStyle = 'rgba(255,255,255,.28)';
+    ctx.strokeRect(x0 + camera.x*sx, y0 + camera.y*sy, VIEW_W*sx, VIEW_H*sy);
+
+    // obstacles (sparse)
+    ctx.globalAlpha = 0.5;
+    ctx.fillStyle = 'rgba(124,92,255,.35)';
+    for(const o of world.obstacles){
+      ctx.fillRect(x0+o.x*sx, y0+o.y*sy, Math.max(1,o.w*sx), Math.max(1,o.h*sy));
+    }
+    ctx.globalAlpha = 1;
+
+    // player
+    ctx.fillStyle = 'rgba(52,211,153,.95)';
+    ctx.fillRect(x0 + player.x*sx - 2, y0 + player.y*sy - 2, 4, 4);
+
+    // enemies
+    ctx.fillStyle = 'rgba(255,77,109,.75)';
+    for(const e of world.enemies){
+      const px = x0 + e.x*sx;
+      const py = y0 + e.y*sy;
+      if(px<x0||py<y0||px>x0+w||py>y0+h) continue;
+      ctx.fillRect(px-1,py-1,2,2);
+    }
+  }
+
+  function loop(){
+    const t = performance.now();
+    const dt = Math.min(0.033, (t-lastT)/1000);
+    lastT = t;
+
+    update(dt);
+    draw();
+
+    requestAnimationFrame(loop);
+  }
+
+  // start loop immediately so the start screen still renders
+  requestAnimationFrame(loop);
+
+  // key action: reload / place / use
+  window.addEventListener('keydown', (e)=>{
+    const k = e.key.toLowerCase();
+    if(k==='r') e.preventDefault();
+    if(k==='e' || k==='q') e.preventDefault();
+  }, {passive:false});
+
+  // keep canvas crisp inside responsive shell
+  window.addEventListener('resize', resizeCanvas);
+
+  </script>
+</body>
+</html>
