@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>微型自动都市 (Mini Auto City)</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #2c3e50;
+            color: white;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin: 0;
+            padding: 20px;
+            overflow: hidden;
+        }
+        h1 { margin: 0 0 10px 0; font-size: 24px; }
+        #game-container {
+            display: flex;
+            gap: 20px;
+        }
+        canvas {
+            background-color: #34495e;
+            border: 4px solid #ecf0f1;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+            cursor: crosshair;
+        }
+        #sidebar {
+            width: 250px;
+            background: #34495e;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.3);
+        }
+        .stat-box {
+            background: rgba(0,0,0,0.2);
+            padding: 10px;
+            margin-bottom: 10px;
+            border-radius: 4px;
+        }
+        .stat-label { font-size: 12px; color: #bdc3c7; }
+        .stat-value { font-size: 18px; font-weight: bold; }
+        
+        button {
+            width: 100%;
+            padding: 12px;
+            margin-bottom: 10px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.2s;
+            text-align: left;
+            position: relative;
+        }
+        button:hover { filter: brightness(1.1); transform: translateX(2px); }
+        button.active { border-left: 5px solid white; }
+
+        .btn-house { background-color: #2ecc71; color: white; }
+        .btn-shop { background-color: #3498db; color: white; }
+        .btn-farm { background-color: #f1c40f; color: #2c3e50; }
+        .btn-industry { background-color: #95a5a6; color: white; }
+        .btn-delete { background-color: #e74c3c; color: white; }
+
+        .cost { font-size: 10px; float: right; opacity: 0.8; }
+
+        #difficulty-screen {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(44, 62, 80, 0.95);
+            display: flex; flex-direction: column;
+            justify-content: center; align-items: center;
+            z-index: 100;
+        }
+        .diff-btn {
+            width: 200px; margin: 10px; text-align: center;
+            font-size: 18px; padding: 15px;
+        }
+
+        #message-area {
+            height: 30px;
+            color: #e74c3c;
+            font-weight: bold;
+            text-align: center;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="difficulty-screen">
+        <h1>选择难度</h1>
+        <p>平衡人口增长与食物消耗</p>
+        <button class="diff-btn btn-house" onclick="startGame('easy')">简单 (资源多，消耗低)</button>
+        <button class="diff-btn btn-shop" onclick="startGame('normal')">普通 (标准体验)</button>
+        <button class="diff-btn btn-delete" onclick="startGame('hard')">困难 (资源少，消耗高)</button>
+    </div>
+
+    <h1>微型自动都市 v1.0</h1>
+
+    <div id="game-container">
+        <canvas id="cityCanvas" width="600" height="600"></canvas>
+        
+        <div id="sidebar">
+            <div class="stat-box">
+                <div class="stat-label">资金 (Money)</div>
+                <div class="stat-value" id="ui-money">$0</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">人口 (Population)</div>
+                <div class="stat-value"><span id="ui-pop">0</span> / <span id="ui-cap">0</span></div>
+            </div>
+            <div class="stat-box" style="display: flex; justify-content: space-between;">
+                <div>
+                    <div class="stat-label">食物 (Food)</div>
+                    <div class="stat-value" id="ui-food">0</div>
+                </div>
+                <div style="text-align: right;">
+                    <div class="stat-label">消耗/产出</div>
+                    <div class="stat-value" id="ui-balance" style="font-size: 14px;">0/s</div>
+                </div>
+            </div>
+
+            <hr style="border-color: rgba(255,255,255,0.1)">
+            <p style="font-size: 12px; color: #bdc3c7;">点击建造 (道路自动生成)</p>
+
+            <button class="btn-house active" onclick="setTool('house')">
+                🏠 居住区 <span class="cost">$50</span>
+                <div style="font-size:10px; font-weight:normal">增加人口上限, 消耗食物</div>
+            </button>
+            <button class="btn-shop" onclick="setTool('shop')">
+                🏢 商业区 <span class="cost">$100</span>
+                <div style="font-size:10px; font-weight:normal">提供工作, 产生税收</div>
+            </button>
+            <button class="btn-farm" onclick="setTool('farm')">
+                🌾 农场 <span class="cost">$80</span>
+                <div style="font-size:10px; font-weight:normal">自动生产食物 (慢)</div>
+            </button>
+            <button class="btn-industry" onclick="setTool('industry')">
+                🏭 进口中心 <span class="cost">$200</span>
+                <div style="font-size:10px; font-weight:normal">花钱买食物 (快)</div>
+            </button>
+            <button class="btn-delete" onclick="setTool('delete')">
+                ❌ 拆除 <span class="cost">$10</span>
+            </button>
+
+            <div id="message-area"></div>
+        </div>
+    </div>
+
+<script>
+/**
+ * 游戏核心逻辑
+ */
+
+// 配置与常量
+const TILE_SIZE = 30;
+const GRID_W = 20;
+const GRID_H = 20;
+const COLORS = {
+    empty: '#34495e',
+    house: '#2ecc71',
+    shop: '#3498db',
+    farm: '#f1c40f',
+    industry: '#95a5a6',
+    road: '#7f8c8d',
+    agent: '#ecf0f1'
+};
+
+// 游戏状态
+let game = {
+    money: 1000,
+    food: 100,
+    population: 0,
+    popCap: 0,
+    grid: [], // 2D array representing the map
+    agents: [],
+    buildings: [],
+    lastTick: 0,
+    difficulty: 'normal',
+    food consumptionRate: 1.0,
+    gameOver: false
+};
+
+let currentTool = 'house';
+
+// 难度配置
+const DIFFICULTY_SETTINGS = {
+    easy: { money: 2000, food: 200, rate: 0.5 },
+    normal: { money: 1000, food: 100, rate: 1.0 },
+    hard: { money: 500, food: 50, rate: 2.0 }
+};
+
+const BUILDING_STATS = {
+    house: { cost: 50, cap: 5, color: COLORS.house },
+    shop: { cost: 100, income: 10, color: COLORS.shop },
+    farm: { cost: 80, foodProd: 2, color: COLORS.farm },
+    industry: { cost: 200, importCost: 5, foodImport: 10, color: COLORS.industry }
+};
+
+// Canvas 设置
+const canvas = document.getElementById('cityCanvas');
+const ctx = canvas.getContext('2d');
+
+// --- 初始化 ---
+
+function initGrid() {
+    game.grid = [];
+    for (let y = 0; y < GRID_H; y++) {
+        let row = [];
+        for (let x = 0; x < GRID_W; x++) {
+            row.push({ type: 'empty', id: null });
+        }
+        game.grid.push(row);
+    }
+}
+
+function startGame(diff) {
+    document.getElementById('difficulty-screen').style.display = 'none';
+    game.difficulty = diff;
+    game.money = DIFFICULTY_SETTINGS[diff].money;
+    game.food = DIFFICULTY_SETTINGS[diff].food;
+    game.consumptionRate = DIFFICULTY_SETTINGS[diff].rate;
+    
+    initGrid();
+    requestAnimationFrame(gameLoop);
+    
+    // 启动经济循环 (每秒一次)
+    setInterval(economyTick, 1000);
+}
+
+// --- 核心类 ---
+
+class Building {
+    constructor(x, y, type) {
+        this.x = x;
+        this.y = y;
+        this.type = type;
+        this.id = Math.random().toString(36).substr(2, 9);
+    }
+}
+
+class Agent {
+    constructor(homeX, homeY) {
+        this.x = homeX * TILE_SIZE + TILE_SIZE/2;
+        this.y = homeY * TILE_SIZE + TILE_SIZE/2;
+        this.homeX = homeX;
+        this.homeY = homeY;
+        this.targetX = null;
+        this.targetY = null;
+        this.state = 'idle'; // idle, moving_work, working, moving_food, eating, moving_home
+        this.speed = 1.5; // 移动速度
+        this.waitTime = 0;
+    }
+
+    update() {
+        if (this.waitTime > 0) {
+            this.waitTime--;
+            return;
+        }
+
+        // 状态机
+        if (this.state === 'idle') {
+            // 在家休息完，去工作
+            const shop = findNearestBuilding(this.x, this.y, 'shop');
+            if (shop) {
+                this.setTarget(shop.x, shop.y, 'moving_work');
+            } else {
+                // 没工作就在家呆着，虽然无聊
+            }
+        } else if (this.state === 'moving_work') {
+            if (this.move()) {
+                this.state = 'working';
+                this.waitTime = 60; // 工作一会
+            }
+        } else if (this.state === 'working') {
+            // 工作完，去找吃的 (农场或进口)
+            const foodSource = findNearestBuilding(this.x, this.y, ['farm', 'industry']);
+            if (foodSource) {
+                this.setTarget(foodSource.x, foodSource.y, 'moving_food');
+            } else {
+                // 没吃的就直接回家
+                this.setTarget(this.homeX, this.homeY, 'moving_home');
+            }
+        } else if (this.state === 'moving_food') {
+            if (this.move()) {
+                this.state = 'eating';
+                this.waitTime = 30; 
+            }
+        } else if (this.state === 'eating') {
+            this.setTarget(this.homeX, this.homeY, 'moving_home');
+        } else if (this.state === 'moving_home') {
+            if (this.move()) {
+                this.state = 'idle';
+                this.waitTime = 50;
+            }
+        }
+    }
+
+    setTarget(tx, ty, newState) {
+        this.targetX = tx * TILE_SIZE + TILE_SIZE/2;
+        this.targetY = ty * TILE_SIZE + TILE_SIZE/2;
+        this.state = newState;
+    }
+
+    move() {
+        const dx = this.targetX - this.x;
+        const dy = this.targetY - this.y;
+        const dist = Math.sqrt(dx*dx + dy*dy);
+
+        if (dist < this.speed) {
+            this.x = this.targetX;
+            this.y = this.targetY;
+            return true; // Arrived
+        }
+
+        this.x += (dx / dist) * this.speed;
+        this.y += (dy / dist) * this.speed;
+        return false;
+    }
+
+    draw(ctx) {
+        ctx.fillStyle = COLORS.agent;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, 3, 0, Math.PI * 2);
+        ctx.fill();
+    }
+}
+
+// --- 辅助函数 ---
+
+function findNearestBuilding(px, py, types) {
+    if (!Array.isArray(types)) types = [types];
+    let nearest = null;
+    let minDist = Infinity;
+
+    // 简单遍历所有建筑 (优化: 对于大地图应使用四叉树，这里20x20直接遍历即可)
+    for (let b of game.buildings) {
+        if (types.includes(b.type)) {
+            // 像素距离
+            const bx = b.x * TILE_SIZE + TILE_SIZE/2;
+            const by = b.y * TILE_SIZE + TILE_SIZE/2;
+            const dist = Math.sqrt((px-bx)**2 + (py-by)**2);
+            if (dist < minDist) {
+                minDist = dist;
+                nearest = b;
+            }
+        }
+    }
+    return nearest;
+}
+
+// --- 交互控制 ---
+
+function setTool(tool) {
+    currentTool = tool;
+    document.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+    document.querySelector(`.btn-${tool}`).classList.add('active');
+}
+
+canvas.addEventListener('mousedown', (e) => {
+    if (game.gameOver) return;
+
+    const rect = canvas.getBoundingClientRect();
+    const x = Math.floor((e.clientX - rect.left) / TILE_SIZE);
+    const y = Math.floor((e.clientY - rect.top) / TILE_SIZE);
+
+    if (x < 0 || x >= GRID_W || y < 0 || y >= GRID_H) return;
+
+    if (currentTool === 'delete') {
+        const tile = game.grid[y][x];
+        if (tile.type !== 'empty') {
+            // 拆除逻辑
+            game.money += 10; // 回收一点钱
+            game.grid[y][x] = { type: 'empty', id: null };
+            game.buildings = game.buildings.filter(b => !(b.x === x && b.y === y));
+            // 如果拆的是房子，人口上限减少，但现有人口不立即死，等自然消耗
+            if (tile.type === 'house') {
+                 // 移除该房子关联的agents (简化处理：随机移除超额人口)
+            }
+            updateUI();
+        }
+    } else {
+        // 建造逻辑
+        const stats = BUILDING_STATS[currentTool];
+        if (game.money >= stats.cost) {
+            if (game.grid[y][x].type === 'empty') {
+                game.money -= stats.cost;
+                game.grid[y][x] = { type: currentTool };
+                game.buildings.push(new Building(x, y, currentTool));
+                
+                if (currentTool === 'house') {
+                    // 房子生成小人
+                    for(let i=0; i<stats.cap; i++) {
+                        game.agents.push(new Agent(x, y));
+                    }
+                    game.population += stats.cap;
+                    game.popCap += stats.cap;
+                }
+                updateUI();
+            } else {
+                showMessage("这里已经有建筑了！");
+            }
+        } else {
+            showMessage("资金不足！");
+        }
+    }
+});
+
+function showMessage(msg) {
+    const el = document.getElementById('message-area');
+    el.innerText = msg;
+    setTimeout(() => el.innerText = "", 2000);
+}
+
+// --- 游戏循环 ---
+
+function economyTick() {
+    if (game.gameOver) return;
+
+    let foodChange = 0;
+    let moneyChange = 0;
+
+    // 1. 消耗食物
+    const consumption = Math.floor(game.population * game.consumptionRate);
+    game.food -= consumption;
+    foodChange -= consumption;
+
+    // 2. 生产食物
+    const farms = game.buildings.filter(b => b.type === 'farm');
+    const farmProd = farms.length * BUILDING_STATS.farm.foodProd;
+    game.food += farmProd;
+    foodChange += farmProd;
+
+    // 3. 工业进口 (如果食物不够，且有钱，自动进口)
+    const industries = game.buildings.filter(b => b.type === 'industry');
+    industries.forEach(ind => {
+        if (game.food < game.population * 5 && game.money >= BUILDING_STATS.industry.importCost) {
+            game.money -= BUILDING_STATS.industry.importCost;
+            game.food += BUILDING_STATS.industry.foodImport;
+            moneyChange -= BUILDING_STATS.industry.importCost;
+            foodChange += BUILDING_STATS.industry.foodImport;
+        }
+    });
+
+    // 4. 税收 (每个商业区 + 每个人口微量税收)
+    const shops = game.buildings.filter(b => b.type === 'shop');
+    const tax = Math.floor(game.population * 0.5) + (shops.length * BUILDING_STATS.shop.income);
+    game.money += tax;
+    moneyChange += tax;
+
+    // 判定生死
+    if (game.food < 0) {
+        game.food = 0;
+        // 饿死人：随机减少人口
+        const deathToll = Math.floor(game.population * 0.2) + 1;
+        game.population = Math.max(0, game.population - deathToll);
+        // 移除死掉的agent
+        game.agents.splice(0, deathToll);
+        showMessage(`警告！食物短缺，${deathToll} 人饿死！`);
+        
+        if (game.population === 0 && game.money < 50) {
+            game.gameOver = true;
+            alert("游戏结束！城市荒废了。刷新页面重试。");
+        }
+    }
+
+    updateUI(foodChange);
+}
+
+function updateUI(foodBalance = 0) {
+    document.getElementById('ui-money').innerText = `$${game.money}`;
+    document.getElementById('ui-pop').innerText = game.population;
+    document.getElementById('ui-cap').innerText = game.popCap;
+    document.getElementById('ui-food').innerText = game.food;
+    
+    const balanceEl = document.getElementById('ui-balance');
+    balanceEl.innerText = (foodBalance >= 0 ? "+" : "") + foodBalance + "/s";
+    balanceEl.style.color = foodBalance >= 0 ? "#2ecc71" : "#e74c3c";
+}
+
+function gameLoop() {
+    // Update Agents
+    game.agents.forEach(agent => agent.update());
+
+    // Draw
+    draw();
+
+    if (!game.gameOver) {
+        requestAnimationFrame(gameLoop);
+    }
+}
+
+function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // 绘制网格
+    ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+    ctx.lineWidth = 1;
+    for (let x = 0; x <= canvas.width; x += TILE_SIZE) {
+        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
+    }
+    for (let y = 0; y <= canvas.height; y += TILE_SIZE) {
+        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
+    }
+
+    // 绘制自动道路连接线 (Auto-Roads)
+    // 逻辑：如果两个建筑距离小于一定范围，画线连接
+    ctx.strokeStyle = COLORS.road;
+    ctx.lineWidth = 4;
+    ctx.lineCap = 'round';
+    
+    // 简单的连接逻辑：每个建筑连接到最近的2个邻居
+    // 为了性能，这里只做简单的全网格扫描，因为数量少
+    // 优化：实际绘制时，只画 "有逻辑关联" 的线会更像路，这里画所有近邻
+    ctx.beginPath();
+    for (let i = 0; i < game.buildings.length; i++) {
+        let b1 = game.buildings[i];
+        for (let j = i + 1; j < game.buildings.length; j++) {
+            let b2 = game.buildings[j];
+            let dist = Math.abs(b1.x - b2.x) + Math.abs(b1.y - b2.y); // 曼哈顿距离
+            if (dist <= 4) { // 只有距离近的才自动修路
+                ctx.moveTo(b1.x * TILE_SIZE + TILE_SIZE/2, b1.y * TILE_SIZE + TILE_SIZE/2);
+                ctx.lineTo(b2.x * TILE_SIZE + TILE_SIZE/2, b2.y * TILE_SIZE + TILE_SIZE/2);
+            }
+        }
+    }
+    ctx.stroke();
+
+    // 绘制建筑
+    for (let y = 0; y < GRID_H; y++) {
+        for (let x = 0; x < GRID_W; x++) {
+            let tile = game.grid[y][x];
+            if (tile.type !== 'empty') {
+                ctx.fillStyle = BUILDING_STATS[tile.type].color;
+                // 简单的阴影效果
+                ctx.fillRect(x * TILE_SIZE + 2, y * TILE_SIZE + 2, TILE_SIZE - 4, TILE_SIZE - 4);
+                
+                // 绘制图标/文字简写
+                ctx.fillStyle = 'rgba(0,0,0,0.3)';
+                ctx.font = '10px Arial';
+                ctx.textAlign = 'center';
+                let icon = '';
+                if(tile.type==='house') icon='H';
+                if(tile.type==='shop') icon='S';
+                if(tile.type==='farm') icon='F';
+                if(tile.type==='industry') icon='I';
+                ctx.fillText(icon, x * TILE_SIZE + TILE_SIZE/2, y * TILE_SIZE + TILE_SIZE/2 + 4);
+            }
+        }
+    }
+
+    // 绘制 Agent
+    game.agents.forEach(agent => agent.draw(ctx));
+}
+
+</script>
+</body>
+</html>
