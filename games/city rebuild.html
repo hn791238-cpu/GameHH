@@ -2,358 +2,225 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <title>God View: A* Pathfinding City v3.0</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>高阶社会演化模拟器 - 终极版</title>
     <style>
-        :root {
-            --bg: #0f172a;
-            --panel: #1e293b;
-            --accent: #38bdf8;
-            --text: #f1f5f9;
+        :root { --bg: #020617; --card: rgba(15, 23, 42, 0.8); --accent: #38bdf8; }
+        body { margin: 0; background: var(--bg); color: #f8fafc; font-family: system-ui, -apple-system, sans-serif; overflow: hidden; }
+        #ui {
+            position: absolute; top: 20px; left: 20px; width: 260px;
+            padding: 20px; border-radius: 16px; background: var(--card);
+            backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.1);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5); pointer-events: none;
         }
-        body { margin: 0; background: var(--bg); color: var(--text); font-family: 'Segoe UI', Tahoma, sans-serif; display: flex; height: 100vh; overflow: hidden; }
-        
-        /* 侧边栏面板 */
-        #sidebar { width: 320px; background: var(--panel); border-right: 1px solid #334155; padding: 25px; display: flex; flex-direction: column; box-shadow: 10px 0 30px rgba(0,0,0,0.5); z-index: 10; }
-        h1 { font-size: 24px; margin: 0 0 20px 0; background: linear-gradient(90deg, #38bdf8, #818cf8); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-        
-        .stat-group { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
-        .stat-card { background: #0f172a; padding: 12px; border-radius: 12px; border: 1px solid #334155; }
-        .stat-label { font-size: 11px; color: #94a3b8; display: block; margin-bottom: 4px; }
-        .stat-val { font-family: 'Courier New', monospace; font-size: 18px; font-weight: bold; color: var(--accent); }
-
-        .btn-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-        button { padding: 12px; border: 1px solid #334155; cursor: pointer; border-radius: 8px; background: #1e293b; color: white; transition: 0.2s; font-size: 13px; font-weight: 500; }
-        button:hover { background: #334155; border-color: var(--accent); }
-        button.active { background: var(--accent); color: #0f172a; border-color: white; box-shadow: 0 0 15px rgba(56, 189, 248, 0.4); }
-
-        canvas { flex-grow: 1; background: #020617; }
-
-        /* 菜单遮罩 */
-        #overlay { position: fixed; inset: 0; background: rgba(2, 6, 23, 0.95); display: flex; align-items: center; justify-content: center; z-index: 100; backdrop-filter: blur(5px); }
-        .menu { background: var(--panel); padding: 50px; border-radius: 24px; text-align: center; border: 1px solid #334155; box-shadow: 0 20px 50px rgba(0,0,0,0.5); }
-        .diff-btn { display: block; width: 220px; padding: 16px; margin: 12px auto; font-size: 16px; border: none; font-weight: bold; }
-
-        #inspector { margin-top: 25px; padding: 15px; background: rgba(15, 23, 42, 0.6); border-radius: 12px; border: 1px solid #334155; min-height: 120px; }
+        .stat-group { margin-bottom: 15px; }
+        .stat-label { font-size: 0.75rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; }
+        .stat-value { font-size: 1.25rem; font-weight: 600; color: var(--accent); }
+        canvas { display: block; image-rendering: pixelated; }
     </style>
 </head>
 <body>
 
-<div id="overlay">
-    <div class="menu">
-        <h1>CITY ARCHITECT v3.0</h1>
-        <p style="color:#94a3b8">点击下方按钮进入上帝视角</p>
-        <button class="diff-btn" style="background:#10b981; color:white;" onclick="startGame(2000)">🏗️ 轻松建设</button>
-        <button class="diff-btn" style="background:#3b82f6; color:white;" onclick="startGame(1000)">🏙️ 标准经营</button>
-        <button class="diff-btn" style="background:#ef4444; color:white;" onclick="startGame(500)">🌋 极限生存</button>
-    </div>
-</div>
-
-<div id="sidebar">
-    <h1>CITY OS</h1>
+<div id="ui">
+    <div style="font-weight:bold; margin-bottom:15px; border-bottom:1px solid #334155; padding-bottom:10px;">社会演化实时监控</div>
     <div class="stat-group">
-        <div class="stat-card"><span class="stat-label">💰 资金</span><span class="stat-val" id="m-val">0</span></div>
-        <div class="stat-card"><span class="stat-label">👥 人口</span><span class="stat-val" id="p-val">0</span></div>
-        <div class="stat-card"><span class="stat-label">🍎 食物</span><span class="stat-val" id="f-val">0</span></div>
-        <div class="stat-card"><span class="stat-label">😊 幸福度</span><span class="stat-val" id="h-val">100%</span></div>
+        <div class="stat-label">总人口 (Agents)</div>
+        <div id="pop" class="stat-value">0</div>
     </div>
-    
-    <div class="btn-grid">
-        <button onclick="setTool(this, 'house')" class="active">🏠 住宅区</button>
-        <button onclick="setTool(this, 'shop')">🛒 商业中心</button>
-        <button onclick="setTool(this, 'farm')">🌾 工业农场</button>
-        <button onclick="setTool(this, 'hospital')">🏥 综合医院</button>
-        <button onclick="setTool(this, 'fire')">🚒 消防总站</button>
-        <button onclick="setTool(this, 'delete')" style="grid-column: span 2; background:#334155;">🔨 拆除与推平</button>
+    <div class="stat-group">
+        <div class="stat-label">社会平均财富</div>
+        <div id="wealth" class="stat-value">0</div>
     </div>
-
-    <div id="inspector">
-        <div style="color:#94a3b8; font-size:12px;">观察窗：未锁定目标</div>
+    <div class="stat-group">
+        <div class="stat-label">群体饥饿预警</div>
+        <div id="hunger-avg" class="stat-value">0%</div>
     </div>
 </div>
-
-<canvas id="gameCanvas"></canvas>
 
 <script>
 /**
- * CITY ARCHITECT v3.0 - A* 引擎版
+ * 核心配置与类定义
  */
+const TILE = 24; // 每个网格像素大小
+const WORLD = { cols: 0, rows: 0 };
+const COLORS = { road: '#1e293b', home: '#2563eb', work: '#dc2626', shop: '#fbbf24', agent: '#fff' };
 
-const TILE = 40;
-const GRID_W = 30, GRID_H = 25;
-const COLORS = {
-    house: '#10b981', shop: '#3b82f6', farm: '#f59e0b',
-    hospital: '#ef4444', fire: '#f97316', road: '#334155'
-};
+let canvas, ctx, grid = [], agents = [], buildings = { homes: [], works: [], shops: [] };
 
-let game = {
-    money: 0, food: 100, tick: 0,
-    grid: [], // 0:空, 1:建筑, 2:道路
-    buildings: [], agents: [],
-    tool: 'house', active: false
-};
-
-const canvas = document.getElementById('gameCanvas');
-const ctx = canvas.getContext('2d');
-
-// --- 路径搜索算法 (A-Star 简化版) ---
-function findPath(sx, sy, tx, ty) {
-    let openList = [{x: sx, y: sy, g: 0, h: Math.abs(sx-tx)+Math.abs(sy-ty), p: null}];
-    let closedList = new Set();
+// 初始化系统
+function init() {
+    canvas = document.createElement('canvas');
+    document.body.appendChild(canvas);
+    ctx = canvas.getContext('2d');
     
-    while(openList.length > 0) {
-        openList.sort((a,b) => (a.g+a.h) - (b.g+b.h));
-        let curr = openList.shift();
-        if(curr.x === tx && curr.y === ty) {
-            let path = [];
-            while(curr) { path.push({x: curr.x, y: curr.y}); curr = curr.p; }
-            return path.reverse();
+    resize();
+    createWorld();
+    
+    // 生成小人
+    for(let i=0; i < 20; i++) {
+        if(buildings.homes.length > 0) agents.push(new Agent());
+    }
+    
+    requestAnimationFrame(loop);
+}
+
+function resize() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    WORLD.cols = Math.floor(canvas.width / TILE);
+    WORLD.rows = Math.floor(canvas.height / TILE);
+}
+
+function createWorld() {
+    // 1. 生成路网（简单的网格布局确保 100% 连通性）
+    for (let x = 0; x < WORLD.cols; x++) {
+        grid[x] = [];
+        for (let y = 0; y < WORLD.rows; y++) {
+            let isRoad = (x % 6 === 0 || y % 6 === 0);
+            grid[x][y] = { x, y, type: isRoad ? 'road' : 'empty', walkable: isRoad };
         }
-        closedList.add(`${curr.x},${curr.y}`);
-        
-        [[0,1],[0,-1],[1,0],[-1,0]].forEach(([dx,dy]) => {
-            let nx = curr.x+dx, ny = curr.y+dy;
-            if(nx>=0 && nx<GRID_W && ny>=0 && ny<GRID_H && !closedList.has(`${nx},${ny}`)) {
-                // 只有空格子或道路可以通行，不能穿过建筑
-                if(game.grid[ny][nx] !== 1 || (nx === tx && ny === ty)) {
-                    let g = curr.g + (game.grid[ny][nx] === 2 ? 0.5 : 1); // 道路通行代价更低
-                    let existing = openList.find(o => o.x === nx && o.y === ny);
-                    if(!existing) openList.push({x: nx, y: ny, g: g, h: Math.abs(nx-tx)+Math.abs(ny-ty), p: curr});
+    }
+
+    // 2. 填充建筑（必须紧邻道路）
+    const types = ['home', 'work', 'shop'];
+    for (let x = 1; x < WORLD.cols - 1; x++) {
+        for (let y = 1; y < WORLD.rows - 1; y++) {
+            if (grid[x][y].type === 'empty') {
+                // 检查周围是否有路
+                if (hasRoadNeighbor(x, y)) {
+                    let rand = Math.random();
+                    let type = rand < 0.1 ? 'home' : (rand < 0.18 ? 'work' : (rand < 0.22 ? 'shop' : 'empty'));
+                    if (type !== 'empty') {
+                        grid[x][y].type = type;
+                        buildings[type + 's'].push(grid[x][y]);
+                    }
                 }
             }
-        });
+        }
     }
-    return null; // 无路可走
 }
 
-// --- 启动逻辑 ---
-function startGame(money) {
-    game.money = money;
-    document.getElementById('overlay').style.display = 'none';
-    for(let y=0; y<GRID_H; y++) {
-        game.grid[y] = [];
-        for(let x=0; x<GRID_W; x++) game.grid[y][x] = 0;
+function hasRoadNeighbor(x, y) {
+    return grid[x+1][y]?.type === 'road' || grid[x-1][y]?.type === 'road' || 
+           grid[x][y+1]?.type === 'road' || grid[x][y-1]?.type === 'road';
+}
+
+// 高效 A* 寻路
+function findPath(start, end) {
+    let open = [start], cameFrom = new Map(), gScore = new Map();
+    const id = p => `${p.x},${p.y}`;
+    gScore.set(id(start), 0);
+
+    while (open.length > 0) {
+        open.sort((a, b) => gScore.get(id(a)) - gScore.get(id(b)));
+        let curr = open.shift();
+
+        if (curr.x === end.x && curr.y === end.y) {
+            let path = [];
+            while(curr) { path.push(curr); curr = cameFrom.get(id(curr)); }
+            return path.reverse();
+        }
+
+        const dirs = [{x:0,y:1},{x:0,y:-1},{x:1,y:0},{x:-1,y:0}];
+        for(let d of dirs) {
+            let nx = curr.x + d.x, ny = curr.y + d.y;
+            if(nx<0||nx>=WORLD.cols||ny<0||ny>=WORLD.rows) continue;
+            let neighbor = grid[nx][ny];
+            if(!neighbor.walkable && !(nx === end.x && ny === end.y)) continue;
+
+            let score = gScore.get(id(curr)) + 1;
+            if(score < (gScore.get(id(neighbor)) ?? Infinity)) {
+                cameFrom.set(id(neighbor), curr);
+                gScore.set(id(neighbor), score);
+                if(!open.includes(neighbor)) open.push(neighbor);
+            }
+        }
     }
-    game.active = true;
-    loop();
-    setInterval(updateLogic, 100);
+    return null;
 }
 
-function setTool(btn, type) {
-    game.tool = type;
-    document.querySelectorAll('.btn-grid button').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-}
-
-// --- 小人 AI ---
+// 小人逻辑类
 class Agent {
-    constructor(hx, hy) {
-        this.hx = hx; this.hy = hy;
-        this.x = hx * TILE + 20; this.y = hy * TILE + 20;
-        this.path = [];
-        this.speed = 2.5; // 大幅提升速度
-        this.stats = { money: 10, health: 100, happy: 100, age: 0 };
-        this.personality = { lazy: Math.random()>0.7, shopper: Math.random()>0.5 };
-        this.state = 'idle'; 
-        this.timer = 0;
+    constructor() {
+        this.home = buildings.homes[Math.floor(Math.random() * buildings.homes.length)];
+        this.x = this.home.x; this.y = this.home.y;
+        this.money = 50; this.energy = 100; this.hunger = 100;
+        this.path = []; this.state = 'IDLE';
+        this.color = `hsl(${Math.random()*360}, 70%, 60%)`;
     }
 
     update() {
-        if(this.path.length > 0) {
-            let target = this.path[0];
-            let tx = target.x * TILE + 20;
-            let ty = target.y * TILE + 20;
-            let dx = tx - this.x;
-            let dy = ty - this.y;
-            let dist = Math.sqrt(dx*dx + dy*dy);
-            
-            // 道路加速
-            let currentGridX = Math.floor(this.x/TILE);
-            let currentGridY = Math.floor(this.y/TILE);
-            let s = (game.grid[currentGridY] && game.grid[currentGridY][currentGridX] === 2) ? this.speed * 1.5 : this.speed;
+        this.hunger -= 0.04; this.energy -= 0.02;
 
-            if(dist < s) {
-                this.x = tx; this.y = ty;
-                this.path.shift();
-            } else {
-                this.x += (dx/dist)*s;
-                this.y += (dy/dist)*s;
-            }
-        } else {
-            this.think();
-        }
-    }
-
-    think() {
-        this.timer--;
-        if(this.timer > 0) return;
-
-        if(this.state === 'idle') {
+        if (this.state === 'IDLE') {
             // 决策逻辑
-            if(this.stats.health < 40) this.assignTask('hospital', 'healing');
-            else if(this.stats.money < (this.personality.lazy?10:60)) this.assignTask(['shop','farm'], 'working');
-            else if(this.personality.shopper && this.stats.happy < 70) this.assignTask('shop', 'shopping');
-            else {
-                // 回家休息
-                this.assignTask('home', 'idle');
-                this.timer = 50; 
+            if (this.hunger < 40 && this.money > 20) this.goal('shop', 'EATING');
+            else if (this.energy < 30) this.goal('home', 'SLEEPING');
+            else this.goal('work', 'WORKING');
+        }
+
+        if (this.state === 'MOVING' && this.path.length > 0) {
+            let step = this.path.shift();
+            this.x = step.x; this.y = step.y;
+            if (this.path.length === 0) {
+                this.state = this.nextTask;
+                this.timer = 100;
             }
-        } else {
-            // 执行完任务后的结算
-            if(this.state === 'working') { this.stats.money += 20; game.money += 5; this.stats.happy -= 5; }
-            if(this.state === 'shopping') { this.stats.money -= 15; this.stats.happy += 30; game.money += 2; }
-            if(this.state === 'healing') { this.stats.health = 100; this.stats.money -= 10; }
-            this.state = 'idle';
-            this.timer = 20;
+        } else if (this.state !== 'IDLE' && this.state !== 'MOVING') {
+            this.timer--;
+            if (this.state === 'WORKING') { this.money += 0.5; this.energy -= 0.1; }
+            if (this.state === 'EATING') { this.hunger += 1; this.money -= 0.3; }
+            if (this.state === 'SLEEPING') { this.energy += 0.8; }
+            if (this.timer <= 0 || this.hunger >= 100 || this.energy >= 100) this.state = 'IDLE';
         }
     }
 
-    assignTask(type, newState) {
-        let tx, ty;
-        if(type === 'home') {
-            tx = this.hx; ty = this.hy;
-        } else {
-            let targets = game.buildings.filter(b => Array.isArray(type) ? type.includes(b.type) : b.type === type);
-            if(targets.length === 0) return;
-            let t = targets[Math.floor(Math.random()*targets.length)];
-            tx = t.x; ty = t.y;
-        }
-        let p = findPath(Math.floor(this.x/TILE), Math.floor(this.y/TILE), tx, ty);
-        if(p) { this.path = p; this.state = newState; }
+    goal(type, next) {
+        let targets = type === 'home' ? [this.home] : buildings[type + 's'];
+        let target = targets[Math.floor(Math.random() * targets.length)];
+        this.path = findPath(grid[this.x][this.y], target) || [];
+        if(this.path.length > 0) { this.state = 'MOVING'; this.nextTask = next; }
+    }
+
+    draw() {
+        ctx.fillStyle = this.color;
+        ctx.beginPath();
+        ctx.arc(this.x * TILE + TILE/2, this.y * TILE + TILE/2, TILE/3, 0, Math.PI*2);
+        ctx.fill();
     }
 }
 
-// --- 逻辑与交互 ---
-function updateLogic() {
-    if(!game.active) return;
-    game.tick++;
-    game.agents.forEach(a => a.update());
-    
-    // UI
-    document.getElementById('m-val').innerText = "$" + Math.floor(game.money);
-    document.getElementById('p-val').innerText = game.agents.length;
-    document.getElementById('f-val').innerText = Math.floor(game.food);
-    let avgH = game.agents.length ? Math.floor(game.agents.reduce((s,a)=>s+a.stats.happy,0)/game.agents.length) : 100;
-    document.getElementById('h-val').innerText = Math.min(100, avgH) + "%";
-}
-
-canvas.addEventListener('mousedown', e => {
-    if(!game.active) return;
-    const rect = canvas.getBoundingClientRect();
-    const x = Math.floor((e.clientX - rect.left) / TILE);
-    const y = Math.floor((e.clientY - rect.top) / TILE);
-
-    if(game.tool === 'delete') {
-        game.buildings = game.buildings.filter(b => !(b.x===x && b.y===y));
-        game.grid[y][x] = 0;
-        // 自动清除多余道路会在下一帧绘制中体现逻辑（简化处理）
-    } else {
-        if(game.grid[y][x] !== 0) return;
-        let cost = 50;
-        if(game.money >= cost) {
-            game.money -= cost;
-            game.grid[y][x] = 1; // 标记建筑
-            game.buildings.push({x, y, type: game.tool});
-            
-            // 核心：智能生成道路
-            // 连接到最近的已有建筑
-            if(game.buildings.length > 1) {
-                let other = game.buildings[game.buildings.length-2];
-                let roadPath = findPath(x, y, other.x, other.y);
-                if(roadPath) {
-                    roadPath.forEach(pt => {
-                        if(game.grid[pt.y][pt.x] === 0) game.grid[pt.y][pt.x] = 2; // 铺设道路
-                    });
-                }
-            }
-
-            if(game.tool === 'house') {
-                for(let i=0; i<3; i++) game.agents.push(new Agent(x, y));
-            }
-        }
-    }
-});
-
-canvas.addEventListener('mousemove', e => {
-    const rect = canvas.getBoundingClientRect();
-    const x = Math.floor((e.clientX - rect.left) / TILE);
-    const y = Math.floor((e.clientY - rect.top) / TILE);
-    let a = game.agents.find(a => Math.floor(a.x/TILE) === x && Math.floor(a.y/TILE) === y);
-    let insp = document.getElementById('inspector');
-    if(a) {
-        insp.innerHTML = `<b style="color:white">👤 居民 ID-${Math.floor(a.x)}</b><br>
-        性格: ${a.personality.lazy?'享乐主义':'奋斗青年'}<br>
-        状态: <span style="color:var(--accent)">${a.state}</span><br>
-        资产: $${Math.floor(a.stats.money)}`;
-    }
-});
-
-// --- 精美渲染 ---
 function loop() {
-    ctx.clearRect(0,0,canvas.width,canvas.height);
-    
-    // 1. 绘制背景网格
-    ctx.strokeStyle = '#1e293b';
-    ctx.lineWidth = 1;
-    for(let i=0; i<=canvas.width; i+=TILE) { ctx.beginPath(); ctx.moveTo(i,0); ctx.lineTo(i,canvas.height); ctx.stroke(); }
-    for(let i=0; i<=canvas.height; i+=TILE) { ctx.beginPath(); ctx.moveTo(0,i); ctx.lineTo(canvas.width,i); ctx.stroke(); }
+    ctx.fillStyle = COLORS.bg;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // 2. 绘制道路
-    ctx.fillStyle = '#334155';
-    for(let y=0; y<GRID_H; y++) {
-        for(let x=0; x<GRID_W; x++) {
-            if(game.grid[y][x] === 2) {
-                ctx.fillRect(x*TILE+2, y*TILE+2, TILE-4, TILE-4);
-            }
+    // 绘制地图
+    for(let x=0; x<WORLD.cols; x++) {
+        for(let y=0; y<WORLD.rows; y++) {
+            let t = grid[x][y].type;
+            if(t === 'empty') continue;
+            ctx.fillStyle = COLORS[t];
+            ctx.fillRect(x*TILE+1, y*TILE+1, TILE-2, TILE-2);
         }
     }
 
-    // 3. 绘制建筑 (加阴影和发光)
-    game.buildings.forEach(b => {
-        ctx.shadowBlur = 15;
-        ctx.shadowColor = COLORS[b.type];
-        ctx.fillStyle = COLORS[b.type];
-        // 绘制圆角矩形
-        let r = 8;
-        let x = b.x*TILE+5, y = b.y*TILE+5, w = TILE-10, h = TILE-10;
-        ctx.beginPath();
-        ctx.moveTo(x+r, y); ctx.lineTo(x+w-r, y); ctx.quadraticCurveTo(x+w, y, x+w, y+r);
-        ctx.lineTo(x+w, y+h-r); ctx.quadraticCurveTo(x+w, y+h, x+w-r, y+h);
-        ctx.lineTo(x+r, y+h); ctx.quadraticCurveTo(x, y+h, x, y+h-r);
-        ctx.lineTo(x, y+r); ctx.quadraticCurveTo(x, y, x+r, y);
-        ctx.fill();
-        ctx.shadowBlur = 0;
-        
-        ctx.fillStyle = 'white';
-        ctx.font = "20px Arial";
-        ctx.textAlign = "center";
-        let icon = "🏠";
-        if(b.type==='shop') icon="🛒";
-        if(b.type==='farm') icon="🌾";
-        if(b.type==='hospital') icon="🏥";
-        if(b.type==='fire') icon="🚒";
-        ctx.fillText(icon, b.x*TILE+20, b.y*TILE+28);
+    // 绘制与更新小人
+    let mSum = 0, hSum = 0;
+    agents.forEach(a => {
+        a.update();
+        a.draw();
+        mSum += a.money; hSum += a.hunger;
     });
 
-    // 4. 绘制小人 (带轨迹感)
-    game.agents.forEach(a => {
-        ctx.fillStyle = a.state === 'working' ? '#f59e0b' : '#f1f5f9';
-        ctx.beginPath();
-        ctx.arc(a.x, a.y, 5, 0, Math.PI*2);
-        ctx.fill();
-        // 绘制生命条
-        ctx.fillStyle = '#ef4444';
-        ctx.fillRect(a.x-5, a.y-10, (a.stats.health/100)*10, 2);
-    });
+    // 更新UI
+    document.getElementById('pop').innerText = agents.length;
+    document.getElementById('wealth').innerText = '￥' + Math.floor(mSum / agents.length || 0);
+    document.getElementById('hunger-avg').innerText = Math.floor(hSum / agents.length || 0) + '%';
 
     requestAnimationFrame(loop);
 }
 
-// 画布自适应
-window.addEventListener('resize', () => {
-    canvas.width = window.innerWidth - 320;
-    canvas.height = window.innerHeight;
-});
-window.dispatchEvent(new Event('resize'));
+window.onload = init;
 </script>
 </body>
 </html>
