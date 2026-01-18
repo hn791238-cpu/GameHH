@@ -1,0 +1,900 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>末日选择：基地求生（剧情分支版）</title>
+  <style>
+    :root{
+      --bg:#07111a; --panel:#0c1a24; --accent:#ff9f1c; --muted:#9fb0bd; --text:#e6eef6;
+      --danger:#ff6b6b; --good:#6ee7b7;
+      font-family: Inter, system-ui, "Helvetica Neue", Arial, "Noto Sans SC", sans-serif;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%;margin:0;background:linear-gradient(180deg,#041018,#07111a);color:var(--text)}
+    .wrap{max-width:1100px;margin:18px auto;padding:12px;display:flex;flex-direction:column;gap:12px}
+    header{display:flex;justify-content:space-between;align-items:center;gap:12px}
+    header h1{margin:0;font-size:1.1rem}
+    .controls{display:flex;gap:8px;align-items:center}
+    .controls input,.controls select{padding:6px;border-radius:6px;border:1px solid rgba(255,255,255,0.04);background:var(--panel);color:var(--text)}
+    .controls button{background:var(--accent);border:none;padding:8px 10px;border-radius:8px;color:#041017;cursor:pointer}
+    main{display:flex;gap:12px}
+    #left{flex:1;display:flex;flex-direction:column;gap:10px}
+    .panel{background:linear-gradient(180deg,#071a22,#08141a);padding:12px;border-radius:10px;box-shadow:0 6px 18px rgba(0,0,0,0.5)}
+    #story{min-height:360px;font-size:0.98rem;line-height:1.6}
+    #choices{display:flex;flex-direction:column;gap:8px;margin-top:8px}
+    .choice{background:#063140;border:1px solid rgba(255,255,255,0.03);padding:10px;border-radius:8px;cursor:pointer;text-align:left}
+    .choice:hover{outline:2px solid rgba(255,159,28,0.15)}
+    #right{width:360px;display:flex;flex-direction:column;gap:10px}
+    .stat-row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px dashed rgba(255,255,255,0.02)}
+    .stat-row:last-child{border-bottom:none}
+    .small{font-size:0.86rem;color:var(--muted)}
+    #log{height:220px;overflow:auto;font-family:monospace;font-size:0.85rem;padding:8px;background:rgba(0,0,0,0.06);border-radius:6px}
+    footer{display:flex;justify-content:space-between;align-items:center;color:var(--muted);font-size:0.9rem}
+    .btn-ghost{background:transparent;border:1px solid rgba(255,255,255,0.04);padding:8px;border-radius:8px;color:var(--text);cursor:pointer}
+    .danger{color:var(--danger)}
+    .good{color:var(--good)}
+    @media (max-width:980px){ main{flex-direction:column} #right{width:100%} }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>末日选择：基地求生（剧情分支版）</h1>
+      <div class="controls">
+        种子: <input id="seed" placeholder="可空（复现填入）" />
+        难度:
+        <select id="difficulty">
+          <option value="easy">简单</option>
+          <option value="normal" selected>普通</option>
+          <option value="hard">困难</option>
+        </select>
+        <button id="new" title="开始新游戏">新游戏</button>
+        <button id="save" class="btn-ghost" title="保存">保存</button>
+        <button id="load" class="btn-ghost" title="读取">读取</button>
+        <button id="export" class="btn-ghost" title="导出存档">导出</button>
+        <button id="import" class="btn-ghost" title="导入存档">导入</button>
+      </div>
+    </header>
+
+    <main>
+      <section id="left">
+        <div class="panel" id="story-panel">
+          <div id="meta" class="small">Day <span id="day">1</span> · 人数 <span id="count">0</span> · 士气 <span id="morale">0</span></div>
+          <div id="story" aria-live="polite"></div>
+          <div id="choices"></div>
+        </div>
+
+        <div class="panel" id="event-panel">
+          <div class="small">当前事件与被触发的回忆/线索</div>
+          <div id="tags" class="small" style="margin-top:8px"></div>
+        </div>
+      </section>
+
+      <aside id="right">
+        <div class="panel">
+          <div class="small">资源</div>
+          <div id="resources">
+            <div class="stat-row"><div>食物</div><div id="res-food">0</div></div>
+            <div class="stat-row"><div>材料</div><div id="res-materials">0</div></div>
+            <div class="stat-row"><div>弹药</div><div id="res-ammo">0</div></div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="small">基地</div>
+          <div id="base-stats" style="margin-top:8px">
+            <div class="stat-row"><div>墙等级</div><div id="wall">0</div></div>
+            <div class="stat-row"><div>农场等级</div><div id="farm">0</div></div>
+            <div class="stat-row"><div>工坊等级</div><div id="workshop">0</div></div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="small">幸存者</div>
+          <div id="survivors" style="margin-top:8px"></div>
+        </div>
+
+        <div class="panel">
+          <div class="small">日志</div>
+          <div id="log"></div>
+        </div>
+      </aside>
+    </main>
+
+    <footer>
+      <div class="small">玩法说明：选择行动→看到结果→第二天。目标：在末日中维持幸存者并达成不同结局。</div>
+      <div>
+        <button id="sound-toggle" class="btn-ghost">音效: 开</button>
+      </div>
+    </footer>
+  </div>
+
+<script>
+/*
+  剧情选择版末日求生（单文件 game）
+  - 选择为主：每天你选择一项主要行动（或触发事件）
+  - 有分支结局：逃离、建成要塞、全灭、牺牲等
+  - 可复现的随机（seed），保存/导出/导入
+  - 简单音效（WebAudio 合成）
+*/
+
+/* ---------------- RNG（可复现） ---------------- */
+function createRNG(seed) {
+  // 基于 xorshift with seed from string
+  let h = 2166136261 >>> 0;
+  if (!seed) seed = Math.random().toString();
+  for (let i=0;i<seed.length;i++){
+    h = Math.imul(h ^ seed.charCodeAt(i), 16777619);
+  }
+  let state = h >>> 0;
+  return {
+    next() {
+      state ^= state << 13;
+      state ^= state >>> 17;
+      state ^= state << 5;
+      state = state >>> 0;
+      return state / 0x100000000;
+    },
+    chance(p){ return this.next() < p; },
+    int(min,max){ return Math.floor(this.next()*(max-min+1))+min; }
+  };
+}
+
+/* ---------------- 初始配置 ---------------- */
+const DEFAULT = {
+  resources: { food: 60, materials: 40, ammo: 20 },
+  baseModules: { wall: 1, farm: 0, workshop: 0 },
+  survivors: [
+    { id:1, name:'阿明', hp:8, maxHp:8, task:'idle' },
+    { id:2, name:'莉莎', hp:7, maxHp:7, task:'idle' }
+  ],
+  dayLimitWin: 30 // 达到该天数并满足条件判定胜利线
+};
+
+let state = null;
+let rng = createRNG(Date.now().toString());
+let audioEnabled = true;
+let audioCtx = null;
+
+/* ---------------- 小工具 ---------------- */
+function uid(){ return Math.floor(Math.random()*1e9).toString(36) + Date.now().toString(36); }
+function el(id){ return document.getElementById(id); }
+function clamp(v,a,b){ return Math.max(a, Math.min(b, v)); }
+function playTone(freq=440, duration=0.12, type='sine', gain=0.08){
+  if (!audioEnabled) return;
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  const o = audioCtx.createOscillator();
+  const g = audioCtx.createGain();
+  o.type = type; o.frequency.value = freq;
+  g.gain.value = gain;
+  o.connect(g); g.connect(audioCtx.destination);
+  o.start();
+  g.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + duration);
+  setTimeout(()=>o.stop(), duration*1000 + 20);
+}
+
+/* ---------------- 初始/重置/保存 ---------------- */
+const SAVE_KEY = 'story_rogue_save_v1';
+
+function newGame(seedText, difficulty='normal') {
+  rng = createRNG(seedText || Date.now().toString());
+  const diff = difficulty || 'normal';
+  state = {
+    id: uid(),
+    seed: seedText || '',
+    difficulty: diff,
+    day: 1,
+    resources: JSON.parse(JSON.stringify(DEFAULT.resources)),
+    base: JSON.parse(JSON.stringify(DEFAULT.baseModules)),
+    survivors: JSON.parse(JSON.stringify(DEFAULT.survivors)),
+    morale: 60, // 0-100
+    eventsFlags: {}, // 用于记录事件/线索
+    log: [],
+    endings: { reached: null },
+  };
+  // 难度修正
+  if (diff === 'hard') {
+    state.resources.food = Math.max(10, Math.floor(state.resources.food*0.7));
+    state.resources.materials = Math.max(8, Math.floor(state.resources.materials*0.7));
+    state.morale = 50;
+  } else if (diff === 'easy') {
+    state.resources.food = Math.floor(state.resources.food*1.3);
+    state.resources.materials = Math.floor(state.resources.materials*1.2);
+    state.morale = 75;
+  }
+  logAdd('游戏开始：你是这个基地的指挥。每一天做出选择，努力让幸存者活下去。');
+  saveAuto();
+  renderAll();
+}
+
+function saveAuto(){ try{ localStorage.setItem(SAVE_KEY, JSON.stringify(state)); }catch(e){ console.error(e); } }
+function manualSave(){ saveAuto(); logAdd('游戏已保存'); renderLog(); }
+function manualLoad(){
+  try{
+    const raw = localStorage.getItem(SAVE_KEY);
+    if (!raw) { logAdd('未找到存档'); renderLog(); return; }
+    state = JSON.parse(raw);
+    rng = createRNG(state.seed || Date.now().toString());
+    logAdd('存档已加载');
+    renderAll();
+  }catch(e){ logAdd('读取存档失败'); console.error(e); }
+}
+function exportSave(){
+  try{
+    const raw = JSON.stringify(state);
+    const blob = new Blob([raw], {type:'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = 'save_story.json'; a.click();
+    URL.revokeObjectURL(url);
+    logAdd('已导出存档');
+  }catch(e){ logAdd('导出失败'); }
+}
+function importSave(){
+  const inp = document.createElement('input'); inp.type='file'; inp.accept='application/json';
+  inp.onchange = ()=> {
+    const f = inp.files[0]; if (!f) return;
+    const r = new FileReader();
+    r.onload = ()=> {
+      try{
+        const raw = r.result;
+        localStorage.setItem(SAVE_KEY, raw);
+        manualLoad();
+        logAdd('已导入存档');
+      }catch(e){ logAdd('导入失败'); }
+    };
+    r.readAsText(f);
+  };
+  inp.click();
+}
+
+/* ---------------- 日志 ---------------- */
+function logAdd(text, type='info'){
+  const e = { id: uid(), t: text, ts: Date.now(), type };
+  if (!state) return;
+  state.log.unshift(e);
+  if (state.log.length > 200) state.log.length = 200;
+  renderLog();
+}
+
+/* ---------------- 渲染 ---------------- */
+function renderAll(){
+  if (!state) return;
+  el('day').textContent = state.day;
+  el('count').textContent = state.survivors.length;
+  el('morale').textContent = state.morale;
+  el('res-food').textContent = state.resources.food;
+  el('res-materials').textContent = state.resources.materials;
+  el('res-ammo').textContent = state.resources.ammo;
+  el('wall').textContent = state.base.wall;
+  el('farm').textContent = state.base.farm;
+  el('workshop').textContent = state.base.workshop;
+  renderSurvivors();
+  renderLog();
+  presentDayOptions(); // 每次渲染时刷新可选操作（如果未在事件分支中）
+}
+
+function renderSurvivors(){
+  const box = el('survivors'); box.innerHTML = '';
+  for (const s of state.survivors){
+    const div = document.createElement('div');
+    div.className = 'small';
+    div.textContent = `${s.name} (HP:${s.hp}/${s.maxHp}) • ${s.task || '空闲'}`;
+    box.appendChild(div);
+  }
+}
+
+function renderLog(){
+  const node = el('log'); if (!node) return;
+  node.innerHTML = '';
+  for (const e of state.log.slice(0,80)){
+    const d = document.createElement('div');
+    d.textContent = `[${new Date(e.ts).toLocaleTimeString()}] ${e.t}`;
+    d.style.opacity = e.type === 'danger' ? '1' : '0.9';
+    node.appendChild(d);
+  }
+}
+
+/* ---------------- 事件与剧情系统 ---------------- */
+
+/*
+  设计思路：
+  - 每天开始时调用 presentDayOptions()，提供 3 个主要选择（scavenge/build/hold/event...）
+  - 选项触发 actionHandlers 中的函数，函数会修改 state、写日志、并调用 advanceDay()
+  - 某些选项/随机事件会触发多步分支（story nodes），通过 pushStoryNode 来显示后续选择
+  - 结局判定在 advanceDay 时执行
+*/
+
+const storyEl = el('story');
+const choicesEl = el('choices');
+const tagsEl = el('tags');
+
+let currentNode = null; // 当处于多步事件/剧情分支时保存
+
+function presentDayOptions(){
+  // 如果正在进行剧情节点，保持当前（不覆盖）
+  if (currentNode) return;
+  storyEl.textContent = `第 ${state.day} 天。\n\n你清晨检查基地：食物 ${state.resources.food}，材料 ${state.resources.materials}，幸存者 ${state.survivors.length}。今天你要做什么？`;
+  // 基本选项（分难度概率/代价）
+  const options = [
+    { id:'scavenge', title:'派人外出拾荒（高风险，可能高收益）', fn: actionScavenge },
+    { id:'fortify', title:'加固防御（消耗材料，提升墙）', fn: actionFortify },
+    { id:'rest', title:'组织全体休整（恢复士气/治疗）', fn: actionRest }
+  ];
+  // 若有 workshop 或特殊条件，解锁更多选项
+  if (state.base.workshop >= 1) options.push({ id:'radio', title:'尝试修复收音机并发送求救信号（需要工坊）', fn: actionRadio });
+  // 小概率触发探索事件/剧情选择（事件库）
+  options.push({ id:'event', title:'调查附近传来的脚步声（可能是事件/剧情）', fn: actionEvent });
+  // 如果食物很低，为求生可添加"劫掠"选项
+  if (state.resources.food < 15) options.push({ id:'raid', title:'冒险劫掠（强烈风险，高回报）', fn: actionRaid });
+
+  // 渲染
+  renderChoices(options.map(o=>({ text:o.title, onClick: ()=>o.fn() })));
+  tagsEl.textContent = Object.keys(state.eventsFlags).filter(k=>state.eventsFlags[k]).join(', ');
+}
+
+/* 用于渲染一组 choice [{text,onClick}] */
+function renderChoices(items){
+  choicesEl.innerHTML = '';
+  for (const it of items){
+    const btn = document.createElement('button');
+    btn.className = 'choice';
+    btn.textContent = it.text;
+    btn.onclick = ()=> {
+      try{
+        it.onClick && it.onClick();
+      }catch(e){ console.error(e); logAdd('执行选项时出现错误'); }
+    };
+    choicesEl.appendChild(btn);
+  }
+}
+
+/* 推入一个多步剧情节点（node 对象包含 text, choices: [{text, handler}]） */
+function pushStoryNode(node){
+  currentNode = node;
+  storyEl.innerHTML = node.text;
+  choicesEl.innerHTML = '';
+  node.choices.forEach((c,i)=>{
+    const btn = document.createElement('button');
+    btn.className = 'choice';
+    btn.textContent = c.text;
+    btn.onclick = ()=> {
+      c.handler && c.handler();
+    };
+    choicesEl.appendChild(btn);
+  });
+}
+
+/* 关闭剧情节点并推进到下一日（或不推进，取决节点） */
+function popStoryNode(advance=true){
+  currentNode = null;
+  if (advance) advanceDay();
+  else renderAll();
+}
+
+/* ---------------- 行动实现 ---------------- */
+
+function actionScavenge(){
+  // 派一个幸存者或小队外出（根据幸存者数量决定）
+  const available = state.survivors.length;
+  if (available <= 0) { logAdd('没有可派出的人手！'); renderAll(); return; }
+  // 构建分支：选择谁或全部
+  const choices = state.survivors.map(s => ({
+    text: `派 ${s.name} 单独外出`,
+    handler: ()=> { scavengeRun([s]); }
+  }));
+  choices.push({ text:'派出全部人手（最大回报，风险最高）', handler: ()=> { scavengeRun(state.survivors.slice()); }});
+  choices.push({ text:'取消', handler: ()=> popStoryNode(false) });
+  pushStoryNode({ text:`你要派谁出去拾荒？`, choices });
+}
+
+function scavengeRun(team){
+  // team 是数组 of survivors
+  const teamNames = team.map(s=>s.name).join('、');
+  logAdd(`${teamNames} 出发拾荒`);
+  playTone(880,0.08,'triangle',0.04);
+  // 成功概率受人数、士气影响，风险与回报随机
+  const baseSuccess = 0.45 + (team.length-1)*0.12 + (state.morale-50)/500;
+  const success = rng.chance(clamp(baseSuccess, 0.12, 0.95));
+  if (success){
+    // 获得物资
+    const food = rng.int(2, 8) * team.length;
+    const mats = rng.int(1, 6) * Math.max(1, Math.floor(team.length/2));
+    const ammo = rng.int(0,3) * Math.max(1, Math.floor(team.length/2));
+    state.resources.food += food;
+    state.resources.materials += mats;
+    state.resources.ammo += ammo;
+    // 小几率获得特殊线索/事件
+    if (rng.chance(0.12)) {
+      state.eventsFlags['distress_note'] = true;
+      logAdd(`${teamNames} 找到线索：一张求救便签`, 'good');
+    } else {
+      logAdd(`${teamNames} 安全返回，带回 食物 ${food}、材料 ${mats}、弹药 ${ammo}`, 'good');
+    }
+    // 少量士气提升
+    state.morale = clamp(state.morale + rng.int(1,4), 0, 100);
+  } else {
+    // 失败：可能受伤或失去人手或遭遇僵尸
+    if (rng.chance(0.5) && team.length > 1) {
+      // 一人牺牲（消失）
+      const lost = team.pop();
+      state.survivors = state.survivors.filter(s => s.id !== lost.id);
+      logAdd(`${teamNames} 遭遇惨烈冲突，${lost.name} 未能返回`, 'danger');
+      playTone(120,0.3,'sawtooth',0.08);
+      state.morale = clamp(state.morale - rng.int(6,12), 0, 100);
+    } else {
+      // 受伤返回或被俘/失踪
+      for (const mem of team){
+        if (rng.chance(0.4)) {
+          const dmg = rng.int(1,3);
+          mem.hp = Math.max(0, mem.hp - dmg);
+          logAdd(`${mem.name} 受伤 -${dmg} HP`);
+        }
+      }
+      // 少量获得物资但不多
+      const f = rng.int(0,3); const m = rng.int(0,2);
+      state.resources.food += f; state.resources.materials += m;
+      logAdd(`${teamNames} 摆脱险境回到基地（受伤但带回少量物资）`, 'danger');
+      playTone(220,0.1,'square',0.06);
+      state.morale = clamp(state.morale - rng.int(2,6), 0, 100);
+    }
+  }
+  // 消耗体力/时间 -> 直接推进日夜
+  popStoryNode(true);
+}
+
+function actionFortify(){
+  // 建造墙体或升级农场/工坊
+  const choices = [
+    { text:'消耗 10 材料 建造/升级 墙 (+1)', handler: ()=> {
+      if (state.resources.materials < 10) { logAdd('材料不足'); renderAll(); return; }
+      state.resources.materials -= 10; state.base.wall += 1;
+      logAdd('加固了墙体，防御提升', 'good'); playTone(520,0.08,'sine',0.06);
+      advanceDay();
+    }},
+    { text:'消耗 8 材料 升级 农场 (+1，增加产出)', handler: ()=> {
+      if (state.resources.materials < 8) { logAdd('材料不足'); renderAll(); return; }
+      state.resources.materials -= 8; state.base.farm += 1;
+      logAdd('升级了农场，提高了产出', 'good'); playTone(660,0.08,'sine',0.06);
+      advanceDay();
+    }},
+    { text:'消耗 12 材料 升级 工坊 (+1，解锁选项)', handler: ()=> {
+      if (state.resources.materials < 12) { logAdd('材料不足'); renderAll(); return; }
+      state.resources.materials -= 12; state.base.workshop += 1;
+      logAdd('工坊升级，修复收音��（广播）等选项可用', 'good'); playTone(720,0.08,'sine',0.06);
+      advanceDay();
+    }},
+    { text:'取消', handler: ()=> popStoryNode(false) }
+  ];
+  pushStoryNode({ text: '选择要强化的模块：', choices });
+}
+
+function actionRest(){
+  // 恢复士气并小量修复/治疗
+  const healTotal = rng.int(1,3);
+  for (const s of state.survivors){
+    s.hp = Math.min(s.maxHp, s.hp + healTotal);
+  }
+  state.morale = clamp(state.morale + rng.int(4,10), 0, 100);
+  state.resources.food = Math.max(0, state.resources.food - state.survivors.length); // 消耗
+  logAdd(`全体休整，恢复 ${healTotal} HP，士气提升。消耗食物 ${state.survivors.length}`);
+  playTone(440,0.12,'sine',0.06);
+  advanceDay();
+}
+
+function actionRadio(){
+  // 多步剧情：尝试修复收音机/广播求救（成功则有撤离线索）
+  const hasWorkshop = state.base.workshop >= 1;
+  if (!hasWorkshop) { logAdd('需要工坊修复收音机'); renderAll(); return; }
+  const choices = [
+    { text:'用工���资源修复天线（花费材料 6）', handler: ()=> {
+      if (state.resources.materials < 6) { logAdd('材料不足'); renderAll(); return; }
+      state.resources.materials -= 6;
+      // 成功概率与工坊等级相关
+      const base = 0.45 + state.base.workshop*0.12;
+      if (rng.chance(clamp(base,0.2,0.95))) {
+        state.eventsFlags['radio_fixed'] = true;
+        logAdd('信号已发送！你收到了可能的撤离坐标（需要更多资源/时间）', 'good');
+        playTone(980,0.12,'triangle',0.07);
+      } else {
+        logAdd('尝试失败，但你学到了一些修复要点', 'info');
+        playTone(240,0.08,'sine',0.04);
+        state.eventsFlags['radio_partial'] = true;
+      }
+      popStoryNode(true);
+    }},
+    { text:'放弃（等待更好机会）', handler: ()=> popStoryNode(false) }
+  ];
+  pushStoryNode({ text:'修复收音机需要材料并有成功率，你要如何操作？', choices });
+}
+
+function actionEvent(){
+  // 随机选择事件节点（带分支结局）
+  const pool = [eventAbandonedHouse, eventStrangeSignal, eventWoundedTraveller, eventRationFind];
+  const ev = pool[rng.int(0, pool.length-1)];
+  ev();
+}
+
+/* 一些事件实现（示例剧本） */
+function eventAbandonedHouse(){
+  const text = `你收到消息：郊外一处旧宅可能有储备，但有多人活动痕迹。要派人去搜查吗？`;
+  const choices = [
+    { text:'派一人前往侦查（低风险）', handler: ()=> {
+      if (state.survivors.length === 0) { logAdd('没有人可派'); popStoryNode(false); return; }
+      const s = state.survivors[rng.int(0, state.survivors.length-1)];
+      logAdd(`${s.name} 去侦查旧宅`);
+      if (rng.chance(0.55)) {
+        const food = rng.int(3,9);
+        state.resources.food += food;
+        logAdd(`${s.name} 找到藏匿的食物 ${food}`, 'good');
+      } else {
+        // 遭遇其他幸存者或敌对队伍 -> 分支对话
+        pushStoryNode({
+          text: `${s.name} 遇到了另一组幸存者，对方看起来戒备。你要：`,
+          choices:[
+            { text:'尝试谈判（可能和平，可能被骗）', handler: ()=> {
+              if (rng.chance(0.45 + (state.morale-50)/200)) {
+                // 成为盟友 -> 新幸存者加入
+                const newOne = { id: uid(), name: '米娅', hp:7, maxHp:7, task:'idle' };
+                state.survivors.push(newOne);
+                state.morale = clamp(state.morale+6,0,100);
+                logAdd('通过谈判获得盟友：米娅 加入', 'good');
+                popStoryNode(true);
+              } else {
+                // 被抢劫
+                state.resources.materials = Math.max(0, state.resources.materials - rng.int(2,6));
+                logAdd('谈判失败，对方抢走了部分材料', 'danger');
+                popStoryNode(true);
+              }
+            }},
+            { text:'埋伏（有战斗风险）', handler: ()=> {
+              if (rng.chance(0.38 + state.base.wall*0.03)) {
+                const loot = rng.int(3,8);
+                state.resources.materials += loot;
+                logAdd('埋伏成功，夺得材料 ' + loot, 'good');
+              } else {
+                // 受伤
+                s.hp = Math.max(0, s.hp - rng.int(2,5));
+                state.morale = clamp(state.morale - 8, 0, 100);
+                logAdd(`${s.name} 在冲突中受伤`, 'danger');
+              }
+              popStoryNode(true);
+            }},
+            { text:'撤退', handler: ()=> { logAdd('决定撤退，避免风险'); popStoryNode(true); } }
+          ]
+        });
+      }
+    }},
+    { text:'直接派全体搜查（风险更高）', handler: ()=> {
+      if (state.survivors.length <= 0) { logAdd('没有人'), popStoryNode(false); return; }
+      // 概率事件
+      if (rng.chance(0.4 + state.survivors.length*0.05)) {
+        const f = rng.int(6,15);
+        state.resources.food += f; state.resources.materials += rng.int(2,6);
+        logAdd('大获收获！带回食物 ' + f, 'good');
+      } else {
+        // 损失与受伤
+        const lost = state.survivors.splice(rng.int(0, state.survivors.length-1),1)[0];
+        logAdd(`${lost.name} 在突发冲突中牺牲`, 'danger');
+        state.morale = clamp(state.morale - 12, 0, 100);
+      }
+      popStoryNode(true);
+    }},
+    { text:'放弃该地点', handler: ()=> { logAdd('放弃搜索旧宅'); popStoryNode(false); } }
+  ];
+  pushStoryNode({ text, choices });
+}
+
+function eventStrangeSignal(){
+  const text = `夜里有人听见远处反复的信号声，像是求救也像是陷阱……`;
+  const choices = [
+    { text:'回应信号（可能有人也可能是埋伏）', handler: ()=> {
+      if (rng.chance(0.4 + (state.base.workshop*0.06))) {
+        // 得到撤离线索（如果已修收音机则成功率更高）
+        state.eventsFlags['evac_hint'] = true;
+        logAdd('回应后得到撤离线索，或许这是逃生的关键', 'good'); playTone(990,0.1,'sine',0.06);
+      } else {
+        // 被引诱，损失
+        state.resources.food = Math.max(0, state.resources.food - rng.int(3,8));
+        state.morale = clamp(state.morale - rng.int(4,8),0,100);
+        logAdd('信��是陷阱，损失了食物，士气受挫', 'danger'); playTone(200,0.12,'sawtooth',0.08);
+      }
+      popStoryNode(true);
+    }},
+    { text:'保持警惕，派哨观察', handler: ()=> {
+      if (rng.chance(0.5)) {
+        // 发现了可用资源（安全侦查）
+        state.resources.materials += rng.int(2,6);
+        logAdd('观察到信号来源并安全回收了一些材料', 'good');
+      } else {
+        logAdd('观察没有发现可用信息');
+      }
+      popStoryNode(true);
+    }},
+    { text:'无视', handler: ()=> { logAdd('选择无视信号'); popStoryNode(true); } }
+  ];
+  pushStoryNode({ text, choices });
+}
+
+function eventWoundedTraveller(){
+  const text = `一个受伤的旅人敲响了基地的大门，他求救并愿意交换信息或劳力。你怎么做？`;
+  const choices = [
+    { text:'收留并治疗（花费食物/材料）', handler: ()=> {
+      if (state.resources.food < 4 || state.resources.materials < 2) {
+        logAdd('资源不足，无法收留'); popStoryNode(false); return;
+      }
+      state.resources.food -= 4; state.resources.materials -= 2;
+      const newOne = { id: uid(), name: '旅人', hp: rng.int(4,8), maxHp: rng.int(6,9), task:'idle' };
+      state.survivors.push(newOne);
+      state.morale = clamp(state.morale + 8, 0, 100);
+      logAdd('你们救下了一位旅人，他加入了你们', 'good');
+      popStoryNode(true);
+    }},
+    { text:'交易（给少量食物换信息）', handler: ()=> {
+      if (state.resources.food < 2) { logAdd('食物不足'); popStoryNode(false); return; }
+      state.resources.food -= 2;
+      state.eventsFlags['map_clue'] = true;
+      logAdd('交易成功，获得一张旧地图线索', 'good');
+      popStoryNode(true);
+    }},
+    { text:'拒绝并驱逐', handler: ()=> { logAdd('你们拒绝了旅人，他独自离去'); state.morale = clamp(state.morale-3,0,100); popStoryNode(true); } }
+  ];
+  pushStoryNode({ text, choices });
+}
+
+function eventRationFind(){
+  const text = `有人发现路边有一个破旧的背包，里面可能有食物和弹药，但看起来有人刚搜过。`;
+  const choices = [
+    { text:'搜查背包（有小概率找到物资）', handler: ()=> {
+      if (rng.chance(0.6)) {
+        const f = rng.int(1,4), a = rng.int(0,2);
+        state.resources.food += f; state.resources.ammo += a;
+        logAdd(`找到 食物 ${f}、弹药 ${a}`, 'good');
+      } else {
+        logAdd('背包已被搜过，未发现有效物资');
+      }
+      popStoryNode(true);
+    }},
+    { text:'放过，可能是陷阱', handler: ()=> { logAdd('决定放过背包以免中招'); popStoryNode(true); } }
+  ];
+  pushStoryNode({ text, choices });
+}
+
+/* 高风险劫掠（当食物短缺时） */
+function actionRaid(){
+  const text = `眼下食物紧缺，可以组织一次劫掠——高风险但可能获得大量食物。你是否进行？`;
+  const choices = [
+    { text:'劫掠（高风险）', handler: ()=> {
+      logAdd('组织劫掠行动');
+      if (rng.chance(0.35 + (state.survivors.length*0.03))) {
+        const f = rng.int(12, 28);
+        state.resources.food += f;
+        state.morale = clamp(state.morale - rng.int(2,6),0,100);
+        logAdd('劫掠成功！获得大量食物：' + f, 'good'); playTone(760,0.08,'triangle',0.06);
+      } else {
+        // 大损失
+        if (rng.chance(0.5) && state.survivors.length>0) {
+          const lost = state.survivors.splice(rng.int(0, state.survivors.length-1),1)[0];
+          logAdd(`${lost.name} 在劫掠中牺牲`, 'danger'); playTone(120,0.22,'sawtooth',0.09);
+        }
+        state.resources.food = Math.max(0, state.resources.food - rng.int(4,12));
+        state.morale = clamp(state.morale - rng.int(8,16),0,100);
+        logAdd('劫掠失败，付出惨痛代价', 'danger');
+      }
+      popStoryNode(true);
+    }},
+    { text:'取消', handler: ()=> popStoryNode(false) }
+  ];
+  pushStoryNode({ text, choices });
+}
+
+/* ---------------- 日终推进与判定 ---------------- */
+function advanceDay(){
+  // 每推进一天会:
+  // - day++
+  // - 农场产出
+  // - 食物消耗（按人数）
+  // - 随机小事件（僵尸袭击等）
+  // - 判定结局
+  // - 保存并渲染
+  // 先执行定期效果
+  state.day += 1;
+  // 农场产���
+  if (state.base.farm > 0) {
+    const gain = rng.int(1,3) * state.base.farm;
+    state.resources.food += gain;
+    logAdd(`农场产出 ${gain} 食物`, 'good');
+  }
+  // 幸存者食物消耗
+  const eat = Math.max(1, state.survivors.length);
+  state.resources.food = Math.max(0, state.resources.food - eat);
+  if (state.resources.food === 0) {
+    // 状况恶化
+    for (const s of state.survivors){
+      if (rng.chance(0.25)) {
+        s.hp = Math.max(0, s.hp - 1);
+      }
+    }
+    state.morale = clamp(state.morale - rng.int(6,12),0,100);
+    logAdd('食物耗尽，大家严重饥饿！', 'danger');
+  } else {
+    // 适量士气波动
+    state.morale = clamp(state.morale + rng.int(-2,3),0,100);
+  }
+
+  // 随机小事件：僵尸袭击概率随天数与墙等级调整
+  const attackChance = clamp(0.12 + state.day*0.01 - state.base.wall*0.03 + (state.difficulty==='hard'?0.04:0), 0.05, 0.5);
+  if (rng.chance(attackChance)){
+    // 攻击发生：根据墙等级决定损失
+    const severity = rng.int(1, 8);
+    const defense = state.base.wall;
+    if (severity > 5 + defense) {
+      // 严重：材料损坏、幸存者伤亡
+      state.resources.materials = Math.max(0, state.resources.materials - rng.int(4,10));
+      if (state.survivors.length>0 && rng.chance(0.4)) {
+        const lost = state.survivors.splice(rng.int(0,state.survivors.length-1),1)[0];
+        logAdd(`夜间袭击！${lost.name} 在防御战中牺牲`, 'danger');
+      } else {
+        logAdd('夜间袭击造成严重破坏，但没有失去人手', 'danger');
+      }
+      state.morale = clamp(state.morale - rng.int(8,14),0,100);
+      playTone(160,0.2,'sawtooth',0.12);
+    } else {
+      // 轻微：损害资源或士气
+      state.resources.materials = Math.max(0, state.resources.materials - rng.int(1,4));
+      state.morale = clamp(state.morale - rng.int(2,6),0,100);
+      logAdd('夜间有袭击被抵挡，损失部分材料', 'info');
+      playTone(240,0.12,'square',0.06);
+    }
+  }
+
+  // 自动：幸存者自然恢复少量HP
+  for (const s of state.survivors){
+    s.hp = Math.min(s.maxHp, s.hp + rng.int(0,1));
+  }
+
+  // 判定结束/胜利条件
+  const end = checkEndings();
+  if (end) {
+    state.endings.reached = end.key;
+    logAdd(`结局达成：${end.title}`, end.type === 'win' ? 'good' : 'danger');
+    // 展示结局页面（覆盖选择）
+    presentEnding(end);
+    saveAuto();
+    return;
+  }
+
+  saveAuto();
+  renderAll();
+}
+
+/* 结局判定：
+  - 撤离（Evacuate）：若修好收音机且拥有某些资源和 day>=5 -> 选择撤离并尝试
+  - 要塞（Fortress）：持续到 dayLimitWin 并墙等级 >=5 -> 胜利
+  - 全灭（Overrun）：所有幸存者死亡 -> 失败
+  - 饥饿（Starvation）: 食物持续为0 若多日后无食物 -> 失败
+*/
+function checkEndings(){
+  // 全灭
+  if (state.survivors.length === 0) return { key:'all_dead', title:'全员覆灭', type:'lose' };
+  // 如果修复了收音机并有撤离线索，可触发撤离结局
+  if (state.eventsFlags['radio_fixed'] && state.eventsFlags['evac_hint'] && state.resources.materials >= 20 && state.day >= 5) {
+    return { key:'evacuate_ready', title:'接收到撤离坐标，准备撤离（可选择执行）', type:'win' };
+  }
+  // Fortress win
+  if (state.day >= DEFAULT.dayLimitWin && state.base.wall >= 5) return { key:'fortress', title:'你们成功建成要塞，熬过了危机', type:'win' };
+  // Starvation fail: 若连续多日食物为0（简单判断：食物==0 且 morale极低）
+  if (state.resources.food === 0 && state.morale < 8) return { key:'starvation', title:'饥饿导致崩溃', type:'lose' };
+
+  return null;
+}
+
+/* 展示结局选择/文本（覆盖故事区） */
+function presentEnding(end){
+  let text = '';
+  let choices = [];
+  if (end.key === 'evacuate_ready') {
+    text = `你们收到了撤离的坐标并已准备好物资。现在可以选择：立即撤离或留守并继续提高基地。你要怎么做？`;
+    choices = [
+      { text:'立即带着幸存者撤离（结束，并以撤离结局计算）', handler: ()=> {
+        // 撤离成功概率取决于道具/墙/士气
+        const chance = clamp(0.5 + (state.base.workshop*0.08) + (state.morale-50)/200, 0.15, 0.95);
+        if (rng.chance(chance)) {
+          logAdd('撤离成功！你和幸存者们被救援队带走，活下来了。', 'good');
+          presentFinalScreen('撤离成功：你被救援队接走，结局：生还', true);
+        } else {
+          logAdd('撤离途中遭遇伏击，损失惨重！', 'danger');
+          // 失败导致部分牺牲
+          if (state.survivors.length > 0) state.survivors.splice(0, Math.min(2, state.survivors.length));
+          presentFinalScreen('撤离失败：多数幸存者遇难', false);
+        }
+      }},
+      { text:'拒绝撤离，继续巩固基地', handler: ()=> {
+        logAdd('你决定继续留守基地。也许这是更稳妥的选择。'); advanceDay();
+      }}
+    ];
+  } else if (end.key === 'fortress') {
+    presentFinalScreen('你们建成了坚固的要塞，成功在末世中生存下来。恭喜！', true);
+    return;
+  } else if (end.key === 'all_dead') {
+    presentFinalScreen('基地已无幸存者，一切陷入寂静。', false);
+    return;
+  } else if (end.key === 'starvation') {
+    presentFinalScreen('长期饥荒导致团体崩溃，故事结束。', false);
+    return;
+  } else {
+    presentFinalScreen(end.title || '结局到达', end.type === 'win');
+    return;
+  }
+  pushStoryNode({ text, choices });
+}
+
+/* 展示最终页面（结局文字） */
+function presentFinalScreen(message, win){
+  storyEl.textContent = message;
+  choicesEl.innerHTML = '';
+  const btn = document.createElement('button');
+  btn.className = 'choice';
+  btn.textContent = '开始新游戏';
+  btn.onclick = ()=> {
+    const seed = el('seed').value || Date.now().toString();
+    const diff = el('difficulty').value;
+    newGame(seed, diff);
+  };
+  choicesEl.appendChild(btn);
+
+  const txt = document.createElement('div'); txt.className = 'small'; txt.style.marginTop='8px';
+  txt.textContent = win ? '结局：生存' : '结局：失败';
+  choicesEl.appendChild(txt);
+
+  // 播放不同音效
+  if (win) playTone(880,0.24,'triangle',0.08);
+  else playTone(140,0.5,'sawtooth',0.14);
+
+  // 保留存档以便查看
+  saveAuto();
+}
+
+/* ---------------- UI 绑定 ---------------- */
+document.getElementById('new').addEventListener('click', ()=>{
+  if (!confirm('开始新游戏会覆盖当前进度，确定？')) return;
+  const seed = el('seed').value || Date.now().toString();
+  const diff = el('difficulty').value;
+  newGame(seed, diff);
+});
+document.getElementById('save').addEventListener('click', manualSave);
+document.getElementById('load').addEventListener('click', manualLoad);
+document.getElementById('export').addEventListener('click', exportSave);
+document.getElementById('import').addEventListener('click', importSave);
+document.getElementById('sound-toggle').addEventListener('click', (e)=>{
+  audioEnabled = !audioEnabled;
+  e.target.textContent = '音效: ' + (audioEnabled ? '开' : '关');
+});
+
+/* 快捷键：回车选择第一项（方便测试），数字键选第 N 个选项 */
+window.addEventListener('keydown', (ev)=>{
+  if (!choicesEl) return;
+  const items = Array.from(choicesEl.querySelectorAll('.choice'));
+  if (ev.key === 'Enter' && items[0]) { items[0].click(); }
+  if (/^[1-9]$/.test(ev.key)) {
+    const idx = parseInt(ev.key,10) - 1;
+    if (items[idx]) items[idx].click();
+  }
+});
+
+/* ---------------- 启动时尝试加载存档或创建新游戏 ---------------- */
+(function init(){
+  try{
+    const raw = localStorage.getItem(SAVE_KEY);
+    if (raw) {
+      if (confirm('检测到存档，是否加载？(取消将开始新游戏)')) {
+        manualLoad(); return;
+      }
+    }
+  }catch(e){}
+  newGame(Date.now().toString(), el('difficulty').value);
+})();
+
+</script>
+</body>
+</html>
