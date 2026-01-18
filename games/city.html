@@ -2,126 +2,60 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <title>God View City v2.0 - 深度模拟版</title>
+    <title>God View City: Evolution v2.1</title>
     <style>
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: #1e272e;
-            color: #d2dae2;
-            display: flex;
-            height: 100vh;
-            margin: 0;
-            overflow: hidden;
-            user-select: none;
-        }
+        :root { --panel-bg: #1e272e; --sidebar-bg: #2f3640; --accent: #ffa801; }
+        body { font-family: 'Segoe UI', sans-serif; background: #000; color: #d2dae2; margin: 0; display: flex; height: 100vh; overflow: hidden; }
         
-        /* 布局容器 */
-        #game-layout {
-            display: flex;
-            width: 100%;
-            height: 100%;
-        }
+        #game-layout { display: flex; width: 100%; height: 100%; }
+        #canvas-area { flex: 1; display: flex; justify-content: center; align-items: center; background: radial-gradient(circle, #222 0%, #000 100%); position: relative; }
+        canvas { background: #1a1a1a; border: 2px solid #444; box-shadow: 0 0 50px rgba(0,0,0,0.8); cursor: crosshair; }
 
-        /* 左侧：画布区 */
-        #canvas-area {
-            flex: 1;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            background-color: #000;
-            position: relative;
-        }
-        canvas {
-            background-color: #2f3640;
-            box-shadow: 0 0 50px rgba(0,0,0,0.8);
-            cursor: crosshair;
-        }
-
-        /* 右侧：控制面板 */
-        #sidebar {
-            width: 300px;
-            background: #2f3640;
-            padding: 20px;
-            border-left: 2px solid #485460;
-            display: flex;
-            flex-direction: column;
-            overflow-y: auto;
-        }
-
-        /* 标题与状态 */
-        h1 { margin: 0 0 10px 0; font-size: 22px; color: #ffa801; text-transform: uppercase; letter-spacing: 2px; }
-        .stat-panel {
-            background: rgba(0,0,0,0.3);
-            padding: 15px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-        }
-        .stat-row { display: flex; justify-content: space-between; margin-bottom: 5px; font-size: 14px; }
-        .stat-val { font-weight: bold; font-family: monospace; color: #00d2d3; }
-
-        /* 建筑按钮网格 */
-        .build-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 10px;
-            margin-bottom: 20px;
-        }
-        button {
-            padding: 10px;
-            border: none;
-            border-radius: 6px;
-            cursor: pointer;
-            font-weight: bold;
-            color: white;
-            text-align: center;
-            transition: all 0.2s;
-            position: relative;
-            overflow: hidden;
-        }
-        button:hover { transform: translateY(-2px); filter: brightness(1.2); }
-        button.active { ring: 3px solid white; box-shadow: 0 0 10px rgba(255,255,255,0.5); }
+        /* 右侧面板 */
+        #sidebar { width: 320px; background: var(--sidebar-bg); padding: 20px; border-left: 2px solid #485460; display: flex; flex-direction: column; box-shadow: -5px 0 15px rgba(0,0,0,0.5); }
+        h1 { margin: 0 0 15px 0; font-size: 20px; color: var(--accent); text-align: center; border-bottom: 1px solid #485460; padding-bottom: 10px; }
         
-        /* 颜色定义 */
-        .btn-house { background: #26de81; color: #1e272e; }
-        .btn-shop { background: #4bcffa; color: #1e272e; }
-        .btn-farm { background: #fed330; color: #1e272e; }
-        .btn-hospital { background: #ff7675; color: white; }
-        .btn-police { background: #5758BB; color: white; }
-        .btn-fire { background: #eb3b5a; color: white; }
-        .btn-delete { background: #535c68; grid-column: span 2; }
+        /* 统计数据 */
+        .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
+        .stat-box { background: rgba(0,0,0,0.3); padding: 10px; border-radius: 6px; text-align: center; }
+        .stat-label { font-size: 11px; color: #aaa; display: block; }
+        .stat-val { font-size: 16px; font-weight: bold; color: #00d2d3; font-family: 'Courier New', monospace; }
 
-        .tooltip { font-size: 10px; display: block; opacity: 0.8; margin-top: 2px; font-weight: normal; }
+        /* 建筑工具栏 */
+        .tool-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 20px; }
+        .tool-btn { padding: 12px 5px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; color: white; font-size: 13px; transition: 0.2s; background: #57606f; }
+        .tool-btn:hover { filter: brightness(1.2); transform: scale(1.02); }
+        .tool-btn.active { outline: 2px solid #fff; box-shadow: 0 0 10px var(--accent); }
+        
+        .b-house { background: #26de81; color: #1e272e; }
+        .b-shop { background: #4bcffa; color: #1e272e; }
+        .b-farm { background: #fed330; color: #1e272e; }
+        .b-hosp { background: #ff7675; }
+        .b-pol { background: #5758BB; }
+        .b-fire { background: #eb3b5a; }
+        .b-del { background: #2f3542; grid-column: span 2; }
 
-        /* 信息面板 (上帝视角) */
-        #inspector {
-            background: #1e272e;
-            padding: 15px;
-            border-radius: 8px;
-            border: 1px solid #485460;
-            font-size: 13px;
-            min-height: 100px;
-        }
-        .trait-tag {
-            display: inline-block;
-            padding: 2px 6px;
-            border-radius: 4px;
-            font-size: 10px;
-            margin-right: 5px;
-            margin-bottom: 5px;
-            color: #1e272e;
-            font-weight: bold;
-        }
+        /* 上帝视角观察窗 */
+        #inspector { background: #1e272e; padding: 15px; border-radius: 8px; border: 1px solid #485460; min-height: 120px; margin-top: 10px; }
+        .tag { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: bold; margin: 2px; }
 
-        #notifications {
-            margin-top: auto;
-            color: #ff6b6b;
-            font-size: 12px;
-            height: 20px;
-            text-align: center;
-        }
+        /* 初始遮罩 */
+        #overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.9); z-index: 100; display: flex; flex-direction: column; justify-content: center; align-items: center; }
+        .menu-card { background: var(--sidebar-bg); padding: 40px; border-radius: 15px; text-align: center; }
+        .diff-btn { display: block; width: 250px; padding: 15px; margin: 10px; border: none; border-radius: 8px; cursor: pointer; font-size: 16px; font-weight: bold; transition: 0.3s; color: white; }
     </style>
 </head>
 <body>
+
+<div id="overlay">
+    <div class="menu-card">
+        <h1 style="font-size: 32px; border:none;">上帝视角：都市演化</h1>
+        <p style="color: #aaa; margin-bottom: 30px;">观察、建设、并平衡微型社会的运转</p>
+        <button class="diff-btn b-house" id="start-easy">简单 (资金充裕)</button>
+        <button class="diff-btn b-shop" id="start-normal">普通 (标准挑战)</button>
+        <button class="diff-btn b-fire" id="start-hard">困难 (资源紧缺)</button>
+    </div>
+</div>
 
 <div id="game-layout">
     <div id="canvas-area">
@@ -129,399 +63,327 @@
     </div>
     
     <div id="sidebar">
-        <h1>SimCity God View</h1>
+        <h1>CITY OVERVIEW</h1>
         
-        <div class="stat-panel">
-            <div class="stat-row"><span>资金 (Tax)</span> <span class="stat-val" id="ui-money">$0</span></div>
-            <div class="stat-row"><span>人口 (Pop)</span> <span class="stat-val" id="ui-pop">0</span></div>
-            <div class="stat-row"><span>食物 (Food)</span> <span class="stat-val" id="ui-food">0</span></div>
-            <div class="stat-row"><span>幸福度 (Happy)</span> <span class="stat-val" id="ui-happy">100%</span></div>
+        <div class="stat-grid">
+            <div class="stat-box"><span class="stat-label">资金</span><span class="stat-val" id="ui-money">$0</span></div>
+            <div class="stat-box"><span class="stat-label">人口</span><span class="stat-val" id="ui-pop">0</span></div>
+            <div class="stat-box"><span class="stat-label">食物</span><span class="stat-val" id="ui-food">0</span></div>
+            <div class="stat-box"><span class="stat-label">满意度</span><span class="stat-val" id="ui-happy">100%</span></div>
         </div>
 
-        <div style="font-size:12px; margin-bottom:5px; color:#aaa;">城市规划工具</div>
-        <div class="build-grid">
-            <button class="btn-house active" onclick="setTool('house')">🏠 住宅 <span class="tooltip">$50 | +5人</span></button>
-            <button class="btn-shop" onclick="setTool('shop')">🏢 商场 <span class="tooltip">$100 | 消费</span></button>
-            <button class="btn-farm" onclick="setTool('farm')">🌾 农场 <span class="tooltip">$80 | 食物</span></button>
-            <button class="btn-hospital" onclick="setTool('hospital')">🏥 医院 <span class="tooltip">$300 | 治病</span></button>
-            <button class="btn-police" onclick="setTool('police')">🚓 警局 <span class="tooltip">$250 | 治安</span></button>
-            <button class="btn-fire" onclick="setTool('fire')">🚒 消防 <span class="tooltip">$200 | 防火</span></button>
-            <button class="btn-delete" onclick="setTool('delete')">🔨 拆除建筑 <span class="tooltip">返还 50% 资金</span></button>
+        <div class="tool-grid" id="toolbar">
+            <button class="tool-btn b-house active" data-type="house">🏠 住宅区</button>
+            <button class="tool-btn b-shop" data-type="shop">🏢 商业区</button>
+            <button class="tool-btn b-farm" data-type="farm">🌾 农场</button>
+            <button class="tool-btn b-hosp" data-type="hospital">🏥 医院</button>
+            <button class="tool-btn b-pol" data-type="police">🚓 警局</button>
+            <button class="tool-btn b-fire" data-type="fire_station">🚒 消防站</button>
+            <button class="tool-btn b-del" data-type="delete">🔨 拆除建筑 (50% 返还)</button>
         </div>
 
-        <div style="font-size:12px; margin-bottom:5px; color:#aaa;">观察者面板 (鼠标悬停查看)</div>
-        <div id="inspector">
-            把鼠标放在小人或建筑上...
-        </div>
-
-        <div id="notifications"></div>
+        <div style="font-size:12px; margin-bottom:5px; color:#aaa;">🔍 上帝视角观察窗</div>
+        <div id="inspector">鼠标悬停在居民身上查看...</div>
+        
+        <div id="msg" style="margin-top:auto; color: #ff7675; font-size:12px; text-align:center; height:20px;"></div>
     </div>
 </div>
 
 <script>
 /**
- * God View City v2.0 - Core Logic
+ * God View City v2.1 
  */
 
-// --- 配置 ---
-const TILE_SIZE = 35; // 稍微大一点，看得清楚
-const GRID_W = 22;
-const GRID_H = 20;
-
-const COLORS = {
-    empty: '#2f3640',
-    house: '#26de81',
-    shop: '#4bcffa',
-    farm: '#fed330',
-    hospital: '#ff7675',
-    police: '#5758BB',
-    fire_station: '#eb3b5a',
-    road: '#7f8c8d',
-    fire_overlay: 'rgba(235, 59, 90, 0.5)'
+// --- 常量配置 ---
+const TILE = 35;
+const GRID_W = 22, GRID_H = 20;
+const BUILDING_DATA = {
+    house: { cost: 50, color: '#26de81', icon: '🏠', name: "住宅区", cap: 5 },
+    shop: { cost: 100, color: '#4bcffa', icon: '🛒', name: "商业中心" },
+    farm: { cost: 80, color: '#fed330', icon: '🌾', name: "农场" },
+    hospital: { cost: 300, color: '#ff7675', icon: '✚', name: "医院" },
+    police: { cost: 250, color: '#5758BB', icon: '👮', name: "警察局" },
+    fire_station: { cost: 200, color: '#eb3b5a', icon: '🚒', name: "消防站" }
 };
 
-const BUILDINGS = {
-    house: { cost: 50, cap: 5, color: COLORS.house, name: "住宅区" },
-    shop: { cost: 100, income: 0, color: COLORS.shop, name: "购物中心" }, // 收入来自小人消费
-    farm: { cost: 80, foodProd: 0.8, color: COLORS.farm, name: "有机农场" },
-    hospital: { cost: 300, radius: 5, color: COLORS.hospital, name: "综合医院" },
-    police: { cost: 250, radius: 6, color: COLORS.police, name: "警察局" },
-    fire_station: { cost: 200, radius: 6, color: COLORS.fire_station, name: "消防站" }
-};
-
-// --- 游戏状态 ---
+// --- 全局变量 ---
 let game = {
-    money: 1500,
-    food: 200,
-    population: 0,
-    grid: [],
-    agents: [],
-    buildings: [],
-    tick: 0,
-    avgHappiness: 100
+    started: false,
+    money: 1000, food: 200, pop: 0, 
+    grid: [], buildings: [], agents: [],
+    tool: 'house',
+    tick: 0
 };
-
-let currentTool = 'house';
-let hoveredEntity = null; // 当前鼠标指向的对象
 
 const canvas = document.getElementById('cityCanvas');
 const ctx = canvas.getContext('2d');
 
-// --- 初始化 ---
-function init() {
-    game.grid = [];
-    for (let y = 0; y < GRID_H; y++) {
-        let row = [];
-        for (let x = 0; x < GRID_W; x++) {
-            row.push({ type: 'empty', id: null });
-        }
-        game.grid.push(row);
-    }
+// --- 核心逻辑 ---
+
+function initGame(diff) {
+    // 设置初始资源
+    if(diff === 'easy') { game.money = 2000; game.food = 500; }
+    if(diff === 'hard') { game.money = 500; game.food = 100; }
     
-    // 启动循环
-    requestAnimationFrame(gameLoop);
-    setInterval(simulationTick, 100); // 逻辑更新频率
+    // 初始化网格
+    for(let y=0; y<GRID_H; y++) {
+        game.grid[y] = [];
+        for(let x=0; x<GRID_W; x++) game.grid[y][x] = { type: 'empty' };
+    }
+
+    game.started = true;
+    document.getElementById('overlay').style.display = 'none';
+    
+    requestAnimationFrame(render);
+    setInterval(updateLogic, 150); // 逻辑帧
 }
 
-// --- 类定义 ---
-
+// 代理小人类
 class Agent {
-    constructor(homeX, homeY) {
-        this.x = homeX * TILE_SIZE + TILE_SIZE/2;
-        this.y = homeY * TILE_SIZE + TILE_SIZE/2;
-        this.homeX = homeX;
-        this.homeY = homeY;
+    constructor(hx, hy) {
+        this.homeX = hx; this.homeY = hy;
+        this.x = hx * TILE + TILE/2; this.y = hy * TILE + TILE/2;
+        this.tx = this.x; this.ty = this.y;
+        this.speed = 0.4 + Math.random() * 0.4; // 减慢速度，悠闲移动
         
-        // 移动相关
-        this.targetX = this.x;
-        this.targetY = this.y;
-        this.speed = 0.6; // 减慢速度，更加悠闲
-        this.state = 'idle'; // idle, working, shopping, healing, going_home
-        
-        // 个人属性 (0.0 - 1.0)
-        this.traits = {
-            workEthic: Math.random(), // 勤劳度: 高=喜欢存钱，低=没钱才工作
-            consumerism: Math.random(), // 消费欲: 高=经常买东西
-            resilience: 0.5 + Math.random() * 0.5 // 抵抗力
-        };
-
-        // 个人状态
-        this.stats = {
-            money: 50, // 初始资金
-            health: 100,
-            happiness: 100,
-            hunger: 0
+        this.personality = {
+            lazy: Math.random() < 0.3, // 懒人只在没钱时工作
+            spender: Math.random() > 0.6 // 购物狂喜欢去商场
         };
         
-        this.age = 0;
+        this.stats = { money: 20, health: 100, happy: 100, hunger: 0 };
+        this.state = 'idle'; // idle, work, shop, heal
         this.color = '#fff';
     }
 
-    // 智能决策核心
-    think() {
-        // 状态衰减
-        this.stats.hunger += 0.05;
-        this.stats.happiness -= 0.02;
-        
-        // 如果在移动中，继续移动，不做决策
-        if (this.distToTarget() > 2) return;
-
-        // 1. 优先：生病了找医院
-        if (this.stats.health < 60) {
-            if (this.state !== 'healing') {
-                let hosp = findNearest(this.x, this.y, 'hospital');
-                if (hosp) {
-                    this.state = 'healing';
-                    this.setTargetGrid(hosp.x, hosp.y);
-                    return;
-                }
-            }
-        }
-
-        // 2. 吃饭 (消耗城市库存)
-        if (this.stats.hunger > 80) {
-            if (game.food > 0) {
-                game.food--;
-                this.stats.hunger = 0;
-            } else {
-                this.stats.health -= 5; // 饿掉血
-            }
-        }
-
-        // 3. 没钱了？或者勤劳的人想存钱
-        // 勤劳阈值: 懒人(0.2)只有钱<20才工作，勤劳人(0.9)钱<90就去工作
-        let povertyLine = this.traits.workEthic * 100;
-        if (this.stats.money < povertyLine && this.state !== 'working') {
-            let job = findNearest(this.x, this.y, ['shop', 'farm', 'police', 'hospital']); // 都可以打工
-            if (job) {
-                this.state = 'working';
-                this.setTargetGrid(job.x, job.y);
-                return;
-            }
-        }
-
-        // 4. 不开心？去消费
-        if (this.stats.happiness < 70 && this.stats.money > 10 && this.state !== 'shopping') {
-            if (Math.random() < this.traits.consumerism) {
-                let shop = findNearest(this.x, this.y, 'shop');
-                if (shop) {
-                    this.state = 'shopping';
-                    this.setTargetGrid(shop.x, shop.y);
-                    return;
-                }
-            }
-        }
-
-        // 5. 没事干，回家休息
-        if (this.state !== 'idle') {
-            this.state = 'idle';
-            this.setTargetGrid(this.homeX, this.homeY);
-        } else {
-            // 在家慢慢回血回心情
-            this.stats.health = Math.min(100, this.stats.health + 0.1);
-            this.stats.happiness = Math.min(100, this.stats.happiness + 0.1);
-        }
-    }
-
-    action() {
-        // 到达目的地后的行为
-        if (this.distToTarget() <= 2) {
-            if (this.state === 'working') {
-                this.stats.money += 0.5;
-                this.stats.happiness -= 0.1;
-                // 工作产生税收
-                if (Math.random() > 0.9) game.money += 1; 
-                // 工作一会后回家
-                if (this.stats.money > this.traits.workEthic * 120) this.state = 'idle';
-            }
-            else if (this.state === 'shopping') {
-                this.stats.money -= 0.8;
-                this.stats.happiness += 2;
-                game.money += 0.2; // 消费税
-                if (this.stats.happiness > 95 || this.stats.money < 5) this.state = 'idle';
-            }
-            else if (this.state === 'healing') {
-                this.stats.health += 2;
-                this.stats.money -= 1; // 医疗费
-                if (this.stats.health >= 100) this.state = 'idle';
-            }
-        }
-    }
-
     update() {
-        this.think();
+        // 需求增长
+        this.stats.hunger += 0.1;
+        this.stats.happy -= 0.05;
+
+        // 决策树
+        if(this.atTarget()) {
+            if(this.state === 'idle') {
+                if(this.stats.health < 60) this.findJob('hospital', 'heal');
+                else if(this.stats.money < (this.personality.lazy ? 10 : 50)) this.findJob(['shop','farm','police'], 'work');
+                else if(this.personality.spender && this.stats.happy < 70) this.findJob('shop', 'shop');
+                else if(Math.random() < 0.01) { // 偶尔回家或乱晃
+                    this.tx = this.homeX * TILE + TILE/2 + (Math.random()-0.5)*20;
+                    this.ty = this.homeY * TILE + TILE/2 + (Math.random()-0.5)*20;
+                }
+            } else {
+                this.performAction();
+            }
+        }
         this.move();
-        this.action();
-        this.updateAppearance();
+    }
+
+    findJob(types, newState) {
+        if(!Array.isArray(types)) types = [types];
+        let target = null; let minD = 999;
+        game.buildings.forEach(b => {
+            if(types.includes(b.type)) {
+                let d = Math.abs(b.x - this.homeX) + Math.abs(b.y - this.homeY);
+                if(d < minD) { minD = d; target = b; }
+            }
+        });
+        if(target) {
+            this.state = newState;
+            this.tx = target.x * TILE + TILE/2;
+            this.ty = target.y * TILE + TILE/2;
+        }
+    }
+
+    performAction() {
+        if(this.state === 'work') {
+            this.stats.money += 0.5; this.stats.happy -= 0.1;
+            if(Math.random() > 0.95) game.money += 1; // 交税
+            if(this.stats.money > 100) { this.state = 'idle'; this.tx = this.homeX*TILE+TILE/2; this.ty = this.homeY*TILE+TILE/2; }
+        } else if(this.state === 'shop') {
+            this.stats.money -= 1; this.stats.happy += 2;
+            if(this.stats.happy >= 100 || this.stats.money <= 0) { this.state = 'idle'; this.tx = this.homeX*TILE+TILE/2; this.ty = this.homeY*TILE+TILE/2; }
+        } else if(this.state === 'heal') {
+            this.stats.health += 5;
+            if(this.stats.health >= 100) { this.state = 'idle'; this.tx = this.homeX*TILE+TILE/2; this.ty = this.homeY*TILE+TILE/2; }
+        }
     }
 
     move() {
-        let dx = this.targetX - this.x;
-        let dy = this.targetY - this.y;
+        let dx = this.tx - this.x; let dy = this.ty - this.y;
         let dist = Math.sqrt(dx*dx + dy*dy);
-        if (dist > this.speed) {
-            this.x += (dx/dist) * this.speed;
-            this.y += (dy/dist) * this.speed;
-        }
+        if(dist > this.speed) { this.x += (dx/dist)*this.speed; this.y += (dy/dist)*this.speed; }
     }
 
-    setTargetGrid(gx, gy) {
-        // 随机一点偏移，避免所有人重叠
-        this.targetX = gx * TILE_SIZE + TILE_SIZE/2 + (Math.random()-0.5)*10;
-        this.targetY = gy * TILE_SIZE + TILE_SIZE/2 + (Math.random()-0.5)*10;
-    }
+    atTarget() { return Math.sqrt((this.x-this.tx)**2 + (this.y-this.ty)**2) < 5; }
 
-    distToTarget() {
-        return Math.sqrt((this.x-this.targetX)**2 + (this.y-this.targetY)**2);
-    }
-
-    updateAppearance() {
-        // 根据状态变色，方便上帝观察
-        if (this.stats.health < 50) this.color = '#e74c3c'; // 生病红
-        else if (this.state === 'working') this.color = '#f1c40f'; // 工作黄
-        else if (this.state === 'shopping') this.color = '#3498db'; // 购物蓝
-        else this.color = '#ecf0f1'; // 闲置白
-    }
-
-    draw(ctx) {
-        ctx.fillStyle = this.color;
-        ctx.beginPath();
-        // 如果生病了画个十字
-        if (this.stats.health < 50) {
-            ctx.fillRect(this.x-3, this.y-1, 6, 2);
-            ctx.fillRect(this.x-1, this.y-3, 2, 6);
-        } else {
-            ctx.arc(this.x, this.y, 3, 0, Math.PI*2);
-            ctx.fill();
-        }
+    draw() {
+        let c = '#fff';
+        if(this.state === 'work') c = '#f1c40f';
+        if(this.state === 'shop') c = '#3498db';
+        if(this.stats.health < 50) c = '#e74c3c';
+        ctx.fillStyle = c;
+        ctx.beginPath(); ctx.arc(this.x, this.y, 3.5, 0, Math.PI*2); ctx.fill();
     }
 }
 
-// --- 逻辑系统 ---
-
-function simulationTick() {
+// --- 更新逻辑 ---
+function updateLogic() {
     game.tick++;
+    
+    // 食物消耗
+    if(game.tick % 40 === 0) {
+        let cons = Math.ceil(game.agents.length * 0.5);
+        if(game.food >= cons) game.food -= cons;
+        else {
+            game.agents.forEach(a => { a.stats.health -= 2; a.stats.happy -= 5; });
+            showMsg("⚠️ 城市饥荒中！");
+        }
+    }
 
-    // 1. 建筑功能与灾难
+    // 建筑功能
     game.buildings.forEach(b => {
-        // 农场产出
-        if (b.type === 'farm' && game.tick % 50 === 0) {
-            game.food += BUILDINGS.farm.foodProd * 50; // 积累
+        if(b.type === 'farm' && game.tick % 20 === 0) game.food += 2;
+        // 火灾几率
+        if(!b.fire && Math.random() < 0.0003) {
+            let safe = game.buildings.some(f => f.type === 'fire_station' && Math.abs(f.x-b.x)+Math.abs(f.y-b.y) < 6);
+            if(!safe) b.fire = true;
         }
-        
-        // 火灾逻辑 (如果没有消防局覆盖，有小概率起火)
-        if (!b.onFire && Math.random() < 0.0005) {
-            let protected = findNearest(b.x, b.y, 'fire_station', 6); // 范围6
-            if (!protected) {
-                b.onFire = true;
-                notify(`🔥 火灾发生了！在 ${b.x},${b.y}`);
-            }
-        }
-
-        // 火灾伤害
-        if (b.onFire) {
-            b.health = (b.health || 100) - 1;
-            if (b.health <= 0) {
-                // 烧毁
-                destroyBuilding(b);
-                notify("🏢 一栋建筑被烧毁了！");
-            }
+        if(b.fire) {
+            b.hp -= 0.5;
+            if(b.hp <= 0) removeBuilding(b.x, b.y);
         }
     });
 
-    // 2. 小人更新
-    let totalHappy = 0;
-    game.agents.forEach(a => {
-        a.update();
-        totalHappy += a.stats.happiness;
-    });
-    if (game.agents.length > 0) game.avgHappiness = Math.floor(totalHappy / game.agents.length);
-
+    game.agents.forEach(a => a.update());
     updateUI();
 }
 
-function findNearest(gx, gy, types, maxDistGrid = 999) {
-    if (!Array.isArray(types)) types = [types];
-    let nearest = null;
-    let minD = Infinity;
+function removeBuilding(x, y) {
+    game.buildings = game.buildings.filter(b => !(b.x === x && b.y === y));
+    game.grid[y][x] = { type: 'empty' };
+}
 
-    // 优化：只遍历建筑
-    for (let b of game.buildings) {
-        if (types.includes(b.type) && !b.onFire) {
-            let dist = Math.sqrt((b.x-gx)**2 + (b.y-gy)**2);
-            if (dist < minD && dist <= maxDistGrid) {
-                minD = dist;
-                nearest = b;
+// --- 渲染 ---
+function render() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    // 网格
+    ctx.strokeStyle = '#222';
+    for(let i=0; i<=canvas.width; i+=TILE) { ctx.beginPath(); ctx.moveTo(i,0); ctx.lineTo(i,canvas.height); ctx.stroke(); }
+    for(let i=0; i<=canvas.height; i+=TILE) { ctx.beginPath(); ctx.moveTo(0,i); ctx.lineTo(canvas.width,i); ctx.stroke(); }
+
+    // 智能道路 (只有邻近建筑连接)
+    ctx.strokeStyle = '#444'; ctx.lineWidth = 4;
+    ctx.beginPath();
+    for(let i=0; i<game.buildings.length; i++) {
+        for(let j=i+1; j<game.buildings.length; j++) {
+            let b1 = game.buildings[i], b2 = game.buildings[j];
+            let d = Math.abs(b1.x-b2.x) + Math.abs(b1.y-b2.y);
+            if(d < 5) {
+                ctx.moveTo(b1.x*TILE+TILE/2, b1.y*TILE+TILE/2);
+                ctx.lineTo(b2.x*TILE+TILE/2, b2.y*TILE+TILE/2);
             }
         }
     }
-    return nearest;
+    ctx.stroke();
+
+    // 建筑
+    game.buildings.forEach(b => {
+        let data = BUILDING_DATA[b.type];
+        ctx.fillStyle = data.color;
+        ctx.fillRect(b.x*TILE+4, b.y*TILE+4, TILE-8, TILE-8);
+        ctx.fillStyle = "#fff"; ctx.font = "14px Arial"; ctx.textAlign = "center";
+        ctx.fillText(data.icon, b.x*TILE+TILE/2, b.y*TILE+TILE-10);
+        if(b.fire) { ctx.fillStyle = "rgba(255,0,0,0.5)"; ctx.beginPath(); ctx.arc(b.x*TILE+TILE/2, b.y*TILE+TILE/2, 15, 0, Math.PI*2); ctx.fill(); }
+    });
+
+    // 小人
+    game.agents.forEach(a => a.draw());
+
+    requestAnimationFrame(render);
 }
 
-function destroyBuilding(b) {
-    game.grid[b.y][b.x] = { type: 'empty' };
-    game.buildings = game.buildings.filter(build => build !== b);
-    // 如果是家，可能会让小人无家可归(这里暂简化为不处理小人，小人会一直闲逛)
-}
+// --- 事件监听 ---
 
-// --- 交互与渲染 ---
+// 难度按钮
+document.getElementById('start-easy').addEventListener('click', () => initGame('easy'));
+document.getElementById('start-normal').addEventListener('click', () => initGame('normal'));
+document.getElementById('start-hard').addEventListener('click', () => initGame('hard'));
 
-function setTool(t) {
-    currentTool = t;
-    document.querySelectorAll('.build-grid button').forEach(b => b.classList.remove('active'));
-    document.querySelector(`.btn-${t}`).classList.add('active');
-}
-
-canvas.addEventListener('mousemove', e => {
-    const rect = canvas.getBoundingClientRect();
-    const x = Math.floor((e.clientX - rect.left) / TILE_SIZE);
-    const y = Math.floor((e.clientY - rect.top) / TILE_SIZE);
-    
-    // 寻找鼠标下的小人或建筑
-    let found = null;
-    // 优先找小人
-    for(let a of game.agents) {
-        let ax = Math.floor(a.x / TILE_SIZE);
-        let ay = Math.floor(a.y / TILE_SIZE);
-        if (ax === x && ay === y) {
-            found = { type: 'agent', data: a };
-            break;
-        }
-    }
-    if (!found && x >=0 && x<GRID_W && y>=0 && y<GRID_H) {
-        let cell = game.grid[y][x];
-        if (cell.type !== 'empty') {
-            let b = game.buildings.find(b => b.x === x && b.y === y);
-            found = { type: 'building', data: b };
-        }
-    }
-    
-    updateInspector(found);
+// 工具切换
+document.querySelectorAll('.tool-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        game.tool = btn.getAttribute('data-type');
+    });
 });
 
+// 画布点击 (建造/拆除)
 canvas.addEventListener('mousedown', e => {
+    if(!game.started) return;
     const rect = canvas.getBoundingClientRect();
-    const x = Math.floor((e.clientX - rect.left) / TILE_SIZE);
-    const y = Math.floor((e.clientY - rect.top) / TILE_SIZE);
+    const x = Math.floor((e.clientX - rect.left) / TILE);
+    const y = Math.floor((e.clientY - rect.top) / TILE);
     
-    if (x<0 || x>=GRID_W || y<0 || y>=GRID_H) return;
+    if(x<0 || x>=GRID_W || y<0 || y>=GRID_H) return;
 
-    // 拆除
-    if (currentTool === 'delete') {
+    if(game.tool === 'delete') {
         let b = game.buildings.find(b => b.x === x && b.y === y);
-        if (b) {
-            game.money += BUILDINGS[b.type].cost * 0.5;
-            destroyBuilding(b);
+        if(b) {
+            game.money += BUILDING_DATA[b.type].cost * 0.5;
+            removeBuilding(x, y);
         }
-        return;
+    } else {
+        if(game.grid[y][x].type !== 'empty') return;
+        let data = BUILDING_DATA[game.tool];
+        if(game.money >= data.cost) {
+            game.money -= data.cost;
+            game.grid[y][x] = { type: game.tool };
+            game.buildings.push({ x, y, type: game.tool, hp: 100, fire: false });
+            if(game.tool === 'house') {
+                for(let i=0; i<data.cap; i++) game.agents.push(new Agent(x, y));
+            }
+        } else {
+            showMsg("❌ 资金不足!");
+        }
     }
+});
 
-    // 建造
-    let cell = game.grid[y][x];
-    if (cell.type !== 'empty') {
-        notify("❌ 这里已经有东西了");
-        return;
+// 悬停观察
+canvas.addEventListener('mousemove', e => {
+    if(!game.started) return;
+    const rect = canvas.getBoundingClientRect();
+    const x = Math.floor((e.clientX - rect.left) / TILE);
+    const y = Math.floor((e.clientY - rect.top) / TILE);
+    
+    let targetAgent = game.agents.find(a => Math.floor(a.x/TILE) === x && Math.floor(a.y/TILE) === y);
+    const insp = document.getElementById('inspector');
+    
+    if(targetAgent) {
+        let traits = (targetAgent.personality.lazy ? "<span class='tag' style='background:#95a5a6'>懒惰</span>" : "<span class='tag' style='background:#f1c40f'>勤劳</span>") +
+                     (targetAgent.personality.spender ? "<span class='tag' style='background:#e17055'>消费狂</span>" : "<span class='tag' style='background:#00b894'>节约</span>");
+        insp.innerHTML = `<strong>👤 居民状态</strong><br>心情: ${Math.floor(targetAgent.stats.happy)}% | 存款: $${Math.floor(targetAgent.stats.money)}<br>当前: ${targetAgent.state}<br>${traits}`;
+    } else {
+        let b = game.buildings.find(b => b.x === x && b.y === y);
+        if(b) insp.innerHTML = `<strong>${BUILDING_DATA[b.type].name}</strong><br>状态: ${b.fire ? "🔥 起火!" : "正常"}<br>位置: ${x}, ${y}`;
     }
+});
 
-    let info = BUILDINGS[currentTool];
-    if (game.money >= info.cost) {
+function updateUI() {
+    document.getElementById('ui-money').innerText = "$" + Math.floor(game.money);
+    document.getElementById('ui-pop').innerText = game.agents.length;
+    document.getElementById('ui-food').innerText = Math.floor(game.food);
+    let h = game.agents.length ? Math.floor(game.agents.reduce((a,b)=>a+b.stats.happy, 0)/game.agents.length) : 100;
+    document.getElementById('ui-happy').innerText = h + "%";
+}
+
+function showMsg(m) {
+    const el = document.getElementById('msg');
+    el.innerText = m;
+    setTimeout(() => el.innerText = "", 2000);
+}
+
+</script>
+</body>
+</html>
