@@ -1,0 +1,792 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>城市拾荒：避开感染者</title>
+  <style>
+    :root{
+      --bg:#050812;
+      --panel:rgba(18,26,51,.78);
+      --line:#24305e;
+      --text:#e8ecff;
+      --muted:#aab3d6;
+      --accent:#7c5cff;
+      --danger:#ff4d6d;
+      --ok:#34d399;
+    }
+    *{ box-sizing: border-box; }
+    body{
+      margin:0;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
+      background:
+        radial-gradient(1100px 600px at 30% -10%, rgba(124,92,255,.25), transparent 60%),
+        radial-gradient(900px 600px at 100% 0%, rgba(52,211,153,.16), transparent 55%),
+        var(--bg);
+      color: var(--text);
+      min-height:100vh;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding: 14px;
+    }
+    .shell{
+      width:min(1100px, 100%);
+      border:1px solid var(--line);
+      border-radius: 18px;
+      overflow:hidden;
+      background: rgba(18,26,51,.45);
+      box-shadow: 0 20px 60px rgba(0,0,0,.45);
+    }
+    .top{
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+      align-items:center;
+      justify-content:space-between;
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--line);
+      background: rgba(255,255,255,.03);
+    }
+    .title{ font-weight:900; font-size: 13px; }
+    .hint{ color: var(--muted); font-size: 12px; line-height:1.4; }
+    .btns{ display:flex; gap:8px; flex-wrap:wrap; }
+    button{
+      border:1px solid var(--line);
+      background: rgba(255,255,255,.04);
+      color: var(--text);
+      padding: 8px 10px;
+      border-radius: 12px;
+      cursor:pointer;
+      font-weight: 700;
+      transition: transform .08s ease, border-color .2s ease, background .2s ease;
+    }
+    button:hover{ border-color: rgba(124,92,255,.7); background: rgba(124,92,255,.10); }
+    button:active{ transform: translateY(1px); }
+    .primary{ border-color: rgba(124,92,255,.75); background: rgba(124,92,255,.16); }
+    .danger{ border-color: rgba(255,77,109,.6); background: rgba(255,77,109,.08); }
+    .danger:hover{ border-color: rgba(255,77,109,.9); background: rgba(255,77,109,.12); }
+
+    .stage{ position:relative; width:100%; }
+    canvas{ display:block; width:100%; height:auto; background: #04060f; }
+
+    .overlay{
+      position:absolute; inset:0;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding: 18px;
+      background: rgba(0,0,0,.55);
+    }
+    .card{
+      width:min(720px, 100%);
+      border:1px solid var(--line);
+      border-radius: 18px;
+      background: rgba(18,26,51,.92);
+      padding: 14px;
+      box-shadow: 0 20px 60px rgba(0,0,0,.6);
+    }
+    .card h1{ margin:0 0 8px; font-size: 18px; }
+    .card p{ margin: 6px 0; color: var(--muted); font-size: 13px; line-height:1.7; }
+    .kbd{ font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      border:1px solid var(--line);
+      background: rgba(255,255,255,.03);
+      padding: 2px 6px;
+      border-radius: 8px;
+      font-size: 12px;
+      color: var(--text);
+      display:inline-block;
+      margin: 0 2px;
+    }
+    .row{
+      display:flex;
+      gap:12px;
+      flex-wrap:wrap;
+      align-items:center;
+      justify-content:space-between;
+      margin-top: 10px;
+    }
+    .pill{
+      font-size: 12px;
+      color: var(--muted);
+      border:1px solid var(--line);
+      background: rgba(255,255,255,.03);
+      padding: 6px 10px;
+      border-radius: 999px;
+    }
+
+    .toast{
+      position:absolute;
+      left: 12px;
+      bottom: 12px;
+      padding: 10px 12px;
+      border-radius: 14px;
+      border:1px solid var(--line);
+      background: rgba(18,26,51,.85);
+      color: var(--text);
+      font-size: 12px;
+      line-height:1.5;
+      max-width: min(520px, calc(100% - 24px));
+      display:none;
+    }
+    .toast.show{ display:block; }
+
+    .miniHelp{
+      display:none;
+      position:absolute;
+      top: 10px;
+      left: 10px;
+      padding: 10px 12px;
+      border-radius: 14px;
+      border:1px solid var(--line);
+      background: rgba(18,26,51,.85);
+      color: var(--text);
+      font-size: 12px;
+      line-height:1.6;
+      max-width: min(520px, calc(100% - 24px));
+    }
+    .miniHelp.show{ display:block; }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <div class="top">
+      <div>
+        <div class="title">城市拾荒：避开感染者</div>
+        <div class="hint">2D 俯视角 · 走位/收集/资源管理 · 无血腥</div>
+      </div>
+      <div class="btns">
+        <button id="btnRestart" class="primary">重新开始</button>
+        <button id="btnHelp">操作说明</button>
+        <button id="btnMute">静音</button>
+      </div>
+    </div>
+
+    <div class="stage">
+      <canvas id="c" width="960" height="540"></canvas>
+      <div class="miniHelp" id="miniHelp">
+        <div><b>移动：</b><span class="kbd">W</span><span class="kbd">A</span><span class="kbd">S</span><span class="kbd">D</span> 或方向键</div>
+        <div><b>短跑：</b><span class="kbd">Shift</span>（消耗体力）</div>
+        <div><b>使用物资：</b><span class="kbd">1</span>医疗包 <span class="kbd">2</span>口粮 <span class="kbd">3</span>护盾电池</div>
+        <div><b>暂停：</b><span class="kbd">P</span>　<b>关闭此提示：</b><span class="kbd">H</span></div>
+      </div>
+      <div class="toast" id="toast"></div>
+
+      <div class="overlay" id="overlay">
+        <div class="card">
+          <h1>目标：收集 12 份物资，撑过夜晚</h1>
+          <p>你在一片被隔离的街区里找补给。地图上有障碍物（车、围栏等）会挡路；“感染者”会追你，但你可以利用障碍物绕开。</p>
+          <p><b>小技巧：</b>别直线跑。绕障碍物、拐角拉扯会更安全。体力没了就别硬冲。</p>
+          <div class="row">
+            <div class="pill">无血腥、偏策略：走位 + 物资管理</div>
+            <button id="btnStart" class="primary">开始</button>
+          </div>
+          <p style="margin-top:10px; font-size:12px;">按 <span class="kbd">H</span> 可随时查看操作。</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    'use strict';
+
+    // ======= Utils =======
+    const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+    const rand = (a, b) => a + Math.random() * (b - a);
+    const dist2 = (ax, ay, bx, by) => {
+      const dx = ax - bx, dy = ay - by;
+      return dx*dx + dy*dy;
+    };
+    const now = () => performance.now();
+
+    // ======= Canvas =======
+    const canvas = document.getElementById('c');
+    const ctx = canvas.getContext('2d');
+    const W = canvas.width;
+    const H = canvas.height;
+
+    // ======= UI =======
+    const overlay = document.getElementById('overlay');
+    const btnStart = document.getElementById('btnStart');
+    const btnRestart = document.getElementById('btnRestart');
+    const btnHelp = document.getElementById('btnHelp');
+    const miniHelp = document.getElementById('miniHelp');
+    const toast = document.getElementById('toast');
+    const btnMute = document.getElementById('btnMute');
+
+    // ======= Audio (tiny beeps) =======
+    let muted = false;
+    const audioCtx = (()=>{ try{ return new (window.AudioContext || window.webkitAudioContext)(); }catch{ return null; }})();
+    function beep(freq=440, duration=0.05, type='sine', gain=0.02){
+      if(muted || !audioCtx) return;
+      const t0 = audioCtx.currentTime;
+      const o = audioCtx.createOscillator();
+      const g = audioCtx.createGain();
+      o.type = type;
+      o.frequency.value = freq;
+      g.gain.value = gain;
+      o.connect(g); g.connect(audioCtx.destination);
+      o.start(t0);
+      o.stop(t0 + duration);
+    }
+
+    // ======= Game State =======
+    const keys = new Set();
+    let lastT = now();
+    let running = false;
+    let paused = false;
+
+    const world = {
+      obstacles: [],
+      supplies: [],
+      zombies: [],
+      wave: 1,
+      timeLeft: 120, // seconds
+      goal: 12,
+      collected: 0,
+      danger: 0,
+    };
+
+    const player = {
+      x: W*0.5,
+      y: H*0.5,
+      r: 10,
+      hp: 100,
+      stamina: 100,
+      shield: 0,
+      inv: { med: 0, food: 0, bat: 0 },
+      hurtCooldown: 0,
+    };
+
+    function reset(){
+      world.obstacles = makeObstacles(18);
+      world.supplies = [];
+      world.zombies = [];
+      world.wave = 1;
+      world.timeLeft = 120;
+      world.goal = 12;
+      world.collected = 0;
+      world.danger = 0;
+
+      player.x = W*0.5;
+      player.y = H*0.65;
+      player.hp = 100;
+      player.stamina = 100;
+      player.shield = 0;
+      player.inv = { med: 0, food: 0, bat: 0 };
+      player.hurtCooldown = 0;
+
+      // initial supplies
+      for(let i=0;i<10;i++) spawnSupply();
+
+      // initial zombies
+      for(let i=0;i<4;i++) spawnZombie();
+
+      lastT = now();
+      paused = false;
+    }
+
+    function makeObstacles(n){
+      const obs = [];
+      const tries = n * 10;
+      let t = 0;
+      while(obs.length < n && t < tries){
+        t++;
+        const w = rand(50, 130);
+        const h = rand(30, 110);
+        const x = rand(20, W - 20 - w);
+        const y = rand(40, H - 20 - h);
+        // keep center-ish area a bit open
+        if(dist2(x+w/2, y+h/2, W*0.5, H*0.65) < 120*120) continue;
+        // avoid too much overlap
+        let ok = true;
+        for(const o of obs){
+          if(rectOverlap({x,y,w,h}, o, 10)){ ok = false; break; }
+        }
+        if(ok) obs.push({x,y,w,h});
+      }
+      return obs;
+    }
+
+    function rectOverlap(a, b, pad=0){
+      return !(a.x+a.w+pad < b.x || a.x > b.x+b.w+pad || a.y+a.h+pad < b.y || a.y > b.y+b.h+pad);
+    }
+
+    function spawnSupply(){
+      const types = ['med','food','bat'];
+      const type = types[Math.floor(Math.random()*types.length)];
+      const r = 8;
+      for(let k=0;k<100;k++){
+        const x = rand(20+r, W-20-r);
+        const y = rand(40+r, H-20-r);
+        // not inside obstacles
+        let ok = true;
+        for(const o of world.obstacles){
+          if(circleRectCollide(x,y,r,o)){ ok=false; break; }
+        }
+        if(ok){
+          world.supplies.push({x,y,r,type});
+          return;
+        }
+      }
+    }
+
+    function spawnZombie(){
+      const edge = Math.floor(Math.random()*4);
+      let x=0,y=0;
+      if(edge===0){ x = rand(0,W); y = -20; }
+      if(edge===1){ x = W+20; y = rand(0,H); }
+      if(edge===2){ x = rand(0,W); y = H+20; }
+      if(edge===3){ x = -20; y = rand(0,H); }
+      const r = rand(10, 14);
+      const speed = rand(40, 70);
+      world.zombies.push({x,y,r,speed,hp:1});
+    }
+
+    function circleRectCollide(cx, cy, cr, rect){
+      const nx = clamp(cx, rect.x, rect.x + rect.w);
+      const ny = clamp(cy, rect.y, rect.y + rect.h);
+      return dist2(cx,cy,nx,ny) <= cr*cr;
+    }
+
+    function resolveCircleRect(circle, rect){
+      // push circle out of rect (simple)
+      const nx = clamp(circle.x, rect.x, rect.x + rect.w);
+      const ny = clamp(circle.y, rect.y, rect.y + rect.h);
+      const dx = circle.x - nx;
+      const dy = circle.y - ny;
+      const d2 = dx*dx + dy*dy;
+      if(d2 === 0) return;
+      const d = Math.sqrt(d2);
+      const overlap = circle.r - d;
+      if(overlap > 0){
+        circle.x += (dx/d) * overlap;
+        circle.y += (dy/d) * overlap;
+      }
+    }
+
+    function showToast(msg){
+      toast.textContent = msg;
+      toast.classList.add('show');
+      clearTimeout(showToast._t);
+      showToast._t = setTimeout(()=> toast.classList.remove('show'), 1300);
+    }
+
+    // ======= Controls =======
+    window.addEventListener('keydown', (e)=>{
+      const k = e.key.toLowerCase();
+      if(['arrowup','arrowdown','arrowleft','arrowright',' '].includes(k)) e.preventDefault();
+      keys.add(k);
+
+      if(k === 'p' && running){
+        paused = !paused;
+        beep(paused?260:520, 0.05, 'square', 0.02);
+      }
+      if(k === 'h'){
+        miniHelp.classList.toggle('show');
+        beep(640, 0.04, 'sine', 0.015);
+      }
+      if(!running) return;
+
+      if(k === '1') useItem('med');
+      if(k === '2') useItem('food');
+      if(k === '3') useItem('bat');
+    });
+    window.addEventListener('keyup', (e)=> keys.delete(e.key.toLowerCase()));
+
+    btnStart.addEventListener('click', async ()=>{
+      if(audioCtx){ try{ await audioCtx.resume(); }catch{} }
+      overlay.style.display = 'none';
+      running = true;
+      reset();
+      requestAnimationFrame(loop);
+    });
+
+    btnRestart.addEventListener('click', async ()=>{
+      if(audioCtx){ try{ await audioCtx.resume(); }catch{} }
+      overlay.style.display = 'none';
+      running = true;
+      reset();
+      requestAnimationFrame(loop);
+    });
+
+    btnHelp.addEventListener('click', ()=>{
+      miniHelp.classList.toggle('show');
+      beep(640, 0.04, 'sine', 0.015);
+    });
+
+    btnMute.addEventListener('click', ()=>{
+      muted = !muted;
+      btnMute.textContent = muted ? '取消静音' : '静音';
+      if(!muted) beep(520, 0.05, 'square', 0.02);
+    });
+
+    function useItem(type){
+      if(player.inv[type] <= 0) return;
+      if(type === 'med'){
+        if(player.hp >= 100) return;
+        player.inv.med--;
+        player.hp = clamp(player.hp + 35, 0, 100);
+        beep(740, 0.06, 'sine', 0.02);
+        showToast('使用医疗包：HP +35');
+      }
+      if(type === 'food'){
+        if(player.stamina >= 100) return;
+        player.inv.food--;
+        player.stamina = clamp(player.stamina + 50, 0, 100);
+        beep(560, 0.05, 'triangle', 0.018);
+        showToast('补充口粮：体力 +50');
+      }
+      if(type === 'bat'){
+        player.inv.bat--;
+        player.shield = Math.max(player.shield, 6.0);
+        beep(880, 0.05, 'square', 0.02);
+        showToast('护盾启动：6 秒');
+      }
+    }
+
+    // ======= Main Loop =======
+    function loop(t){
+      if(!running) return;
+      const dt = Math.min(0.033, (t - lastT) / 1000);
+      lastT = t;
+
+      if(!paused){
+        update(dt);
+      }
+      draw();
+      requestAnimationFrame(loop);
+    }
+
+    function update(dt){
+      world.timeLeft = Math.max(0, world.timeLeft - dt);
+      if(world.timeLeft === 0){
+        endGame(world.collected >= world.goal ? 'win' : 'lose');
+        return;
+      }
+
+      // ramp difficulty
+      world.danger += dt;
+      if(world.danger > 12 && world.zombies.length < 18){
+        world.danger = 0;
+        spawnZombie();
+        if(Math.random() < 0.3) spawnZombie();
+      }
+
+      // wave bump every 40s
+      const newWave = 1 + Math.floor((120 - world.timeLeft) / 40);
+      if(newWave !== world.wave){
+        world.wave = newWave;
+        beep(300 + newWave*80, 0.07, 'square', 0.02);
+        showToast('警戒升级：第 ' + world.wave + ' 波');
+        spawnZombie();
+        spawnZombie();
+        spawnSupply();
+      }
+
+      // player
+      if(player.hurtCooldown > 0) player.hurtCooldown = Math.max(0, player.hurtCooldown - dt);
+      if(player.shield > 0) player.shield = Math.max(0, player.shield - dt);
+
+      const move = {x:0, y:0};
+      const up = keys.has('w') || keys.has('arrowup');
+      const down = keys.has('s') || keys.has('arrowdown');
+      const left = keys.has('a') || keys.has('arrowleft');
+      const right = keys.has('d') || keys.has('arrowright');
+
+      if(up) move.y -= 1;
+      if(down) move.y += 1;
+      if(left) move.x -= 1;
+      if(right) move.x += 1;
+
+      const mag = Math.hypot(move.x, move.y) || 1;
+      move.x /= mag; move.y /= mag;
+
+      const sprint = (keys.has('shift') || keys.has('shiftleft') || keys.has('shiftright')) && player.stamina > 0;
+      const baseSpeed = 150;
+      const speed = sprint ? 230 : baseSpeed;
+
+      if(sprint && (up||down||left||right)){
+        player.stamina = Math.max(0, player.stamina - 35*dt);
+      }else{
+        player.stamina = Math.min(100, player.stamina + 18*dt);
+      }
+
+      player.x += move.x * speed * dt;
+      player.y += move.y * speed * dt;
+
+      // keep in bounds
+      player.x = clamp(player.x, player.r, W - player.r);
+      player.y = clamp(player.y, 34 + player.r, H - player.r);
+
+      // collide obstacles
+      for(const o of world.obstacles){
+        resolveCircleRect(player, o);
+      }
+
+      // supplies pickup
+      for(let i=world.supplies.length-1;i>=0;i--){
+        const s = world.supplies[i];
+        if(dist2(player.x, player.y, s.x, s.y) <= (player.r + s.r)*(player.r + s.r)){
+          world.supplies.splice(i,1);
+          player.inv[s.type]++;
+          world.collected++;
+          beep(680, 0.04, 'sine', 0.02);
+          showToast('拾取物资：' + (s.type==='med'?'医疗包':s.type==='food'?'口粮':'护盾电池'));
+          if(world.supplies.length < 9) spawnSupply();
+          if(world.collected >= world.goal){
+            endGame('win');
+            return;
+          }
+        }
+      }
+
+      // zombies update
+      for(const z of world.zombies){
+        // chase player
+        const dx = player.x - z.x;
+        const dy = player.y - z.y;
+        const d = Math.hypot(dx, dy) || 1;
+        const ux = dx/d;
+        const uy = dy/d;
+
+        // slightly jitter to avoid perfect lines
+        const jitter = 0.15;
+        const jx = ux + rand(-jitter,jitter);
+        const jy = uy + rand(-jitter,jitter);
+        const jd = Math.hypot(jx,jy) || 1;
+
+        z.x += (jx/jd) * z.speed * dt;
+        z.y += (jy/jd) * z.speed * dt;
+
+        // collide obstacles
+        for(const o of world.obstacles){
+          resolveCircleRect(z, o);
+        }
+
+        // hit player
+        if(dist2(player.x, player.y, z.x, z.y) <= (player.r + z.r)*(player.r + z.r)){
+          if(player.hurtCooldown === 0){
+            player.hurtCooldown = 0.45;
+            if(player.shield > 0){
+              // shield absorbs
+              player.shield = Math.max(0, player.shield - 1.2);
+              beep(320, 0.04, 'square', 0.015);
+            }else{
+              player.hp = Math.max(0, player.hp - 10);
+              beep(180, 0.06, 'sawtooth', 0.02);
+              if(player.hp === 0){
+                endGame('lose');
+                return;
+              }
+            }
+          }
+        }
+      }
+    }
+
+    function endGame(result){
+      running = true;
+      paused = true;
+
+      const title = result === 'win' ? '你活下来了（通关）' : '体力耗尽（失败）';
+      const sub = result === 'win'
+        ? `你收集了 ${world.collected} 份物资，并撑过了这段时间。`
+        : `你收集了 ${world.collected}/${world.goal} 份物资。下次试试多绕障碍物。`;
+
+      overlay.style.display = 'flex';
+      overlay.innerHTML = `
+        <div class="card">
+          <h1>${title}</h1>
+          <p>${sub}</p>
+          <p style="margin-top:10px;"><b>战术复盘：</b>这关核心是“路线选择”。看到障碍物就把它当成盾牌，拐角能甩开追击。</p>
+          <div class="row">
+            <div class="pill">波次：${world.wave} · 剩余时间：${Math.ceil(world.timeLeft)}s</div>
+            <button id="again" class="primary">再来一局</button>
+          </div>
+          <p style="margin-top:10px; font-size:12px;">按 <span class="kbd">H</span> 可随时查看操作。</p>
+        </div>
+      `;
+
+      document.getElementById('again').onclick = ()=>{
+        overlay.style.display = 'none';
+        reset();
+        paused = false;
+      };
+
+      beep(result==='win'?880:140, 0.12, 'square', 0.03);
+      setTimeout(()=> beep(result==='win'?660:220, 0.10, 'sine', 0.02), 140);
+    }
+
+    // ======= Render =======
+    function draw(){
+      ctx.clearRect(0,0,W,H);
+
+      // background grid
+      ctx.save();
+      ctx.globalAlpha = 0.15;
+      ctx.strokeStyle = '#91a0ff';
+      ctx.lineWidth = 1;
+      for(let x=0; x<=W; x+=40){
+        ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke();
+      }
+      for(let y=0; y<=H; y+=40){
+        ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke();
+      }
+      ctx.restore();
+
+      // obstacles
+      ctx.save();
+      for(const o of world.obstacles){
+        ctx.fillStyle = 'rgba(36,48,94,0.9)';
+        ctx.fillRect(o.x, o.y, o.w, o.h);
+        ctx.strokeStyle = 'rgba(124,92,255,0.35)';
+        ctx.strokeRect(o.x+0.5, o.y+0.5, o.w-1, o.h-1);
+      }
+      ctx.restore();
+
+      // supplies
+      for(const s of world.supplies){
+        if(s.type==='med') ctx.fillStyle = 'rgba(52,211,153,0.95)';
+        if(s.type==='food') ctx.fillStyle = 'rgba(250,204,21,0.95)';
+        if(s.type==='bat') ctx.fillStyle = 'rgba(124,92,255,0.95)';
+        ctx.beginPath();
+        ctx.arc(s.x, s.y, s.r, 0, Math.PI*2);
+        ctx.fill();
+
+        // tiny icon
+        ctx.save();
+        ctx.strokeStyle = 'rgba(0,0,0,0.6)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        if(s.type==='med'){
+          ctx.moveTo(s.x-4, s.y); ctx.lineTo(s.x+4, s.y);
+          ctx.moveTo(s.x, s.y-4); ctx.lineTo(s.x, s.y+4);
+        }else if(s.type==='food'){
+          ctx.arc(s.x, s.y, 3, 0, Math.PI*2);
+        }else{
+          ctx.moveTo(s.x-4, s.y-2); ctx.lineTo(s.x+4, s.y-2);
+          ctx.moveTo(s.x-4, s.y+2); ctx.lineTo(s.x+4, s.y+2);
+        }
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      // zombies
+      for(const z of world.zombies){
+        ctx.fillStyle = 'rgba(255,77,109,0.85)';
+        ctx.beginPath();
+        ctx.arc(z.x, z.y, z.r, 0, Math.PI*2);
+        ctx.fill();
+
+        // eyes
+        ctx.save();
+        ctx.fillStyle = 'rgba(0,0,0,0.55)';
+        ctx.beginPath();
+        ctx.arc(z.x-3, z.y-2, 2, 0, Math.PI*2);
+        ctx.arc(z.x+3, z.y-2, 2, 0, Math.PI*2);
+        ctx.fill();
+        ctx.restore();
+      }
+
+      // player
+      ctx.save();
+      ctx.fillStyle = 'rgba(232,236,255,0.95)';
+      ctx.beginPath();
+      ctx.arc(player.x, player.y, player.r, 0, Math.PI*2);
+      ctx.fill();
+
+      // shield ring
+      if(player.shield > 0){
+        ctx.strokeStyle = 'rgba(124,92,255,0.75)';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(player.x, player.y, player.r + 6, 0, Math.PI*2);
+        ctx.stroke();
+      }
+      ctx.restore();
+
+      // HUD
+      drawHUD();
+
+      // Pause overlay text
+      if(paused && overlay.style.display==='none'){
+        ctx.save();
+        ctx.fillStyle = 'rgba(0,0,0,0.55)';
+        ctx.fillRect(0,0,W,H);
+        ctx.fillStyle = 'rgba(232,236,255,0.95)';
+        ctx.font = '700 28px ui-sans-serif, system-ui';
+        ctx.textAlign = 'center';
+        ctx.fillText('暂停', W/2, H/2 - 8);
+        ctx.font = '500 14px ui-sans-serif, system-ui';
+        ctx.fillStyle = 'rgba(170,179,214,0.95)';
+        ctx.fillText('按 P 继续', W/2, H/2 + 18);
+        ctx.restore();
+      }
+    }
+
+    function drawHUD(){
+      const pad = 10;
+      const barW = 220;
+      const barH = 10;
+
+      ctx.save();
+      ctx.fillStyle = 'rgba(18,26,51,0.72)';
+      ctx.strokeStyle = 'rgba(36,48,94,0.9)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      roundRect(ctx, pad, pad, W - pad*2, 44, 12);
+      ctx.fill();
+      ctx.stroke();
+
+      // HP
+      ctx.fillStyle = 'rgba(170,179,214,0.95)';
+      ctx.font = '700 12px ui-sans-serif, system-ui';
+      ctx.fillText('HP', pad+12, pad+17);
+      drawBar(pad+38, pad+9, barW, barH, player.hp/100, 'rgba(255,77,109,0.9)');
+
+      // stamina
+      ctx.fillStyle = 'rgba(170,179,214,0.95)';
+      ctx.fillText('体力', pad+12, pad+37);
+      drawBar(pad+38, pad+29, barW, barH, player.stamina/100, 'rgba(250,204,21,0.85)');
+
+      // right stats
+      ctx.textAlign = 'right';
+      ctx.fillStyle = 'rgba(232,236,255,0.95)';
+      ctx.font = '800 12px ui-sans-serif, system-ui';
+      ctx.fillText(`物资 ${world.collected}/${world.goal}  ·  波次 ${world.wave}  ·  剩余 ${Math.ceil(world.timeLeft)}s`, W-pad-12, pad+17);
+
+      ctx.fillStyle = 'rgba(170,179,214,0.95)';
+      ctx.font = '600 12px ui-sans-serif, system-ui';
+      const inv = player.inv;
+      const shieldTxt = player.shield>0 ? `护盾 ${player.shield.toFixed(1)}s` : '护盾 0s';
+      ctx.fillText(`医疗包 ${inv.med}  ·  口粮 ${inv.food}  ·  电池 ${inv.bat}  ·  ${shieldTxt}`, W-pad-12, pad+37);
+
+      ctx.restore();
+    }
+
+    function drawBar(x, y, w, h, t, fillStyle){
+      ctx.save();
+      ctx.fillStyle = 'rgba(255,255,255,0.06)';
+      roundRect(ctx, x, y, w, h, 8); ctx.fill();
+      ctx.fillStyle = fillStyle;
+      roundRect(ctx, x, y, w*clamp(t,0,1), h, 8); ctx.fill();
+      ctx.restore();
+    }
+
+    function roundRect(ctx, x, y, w, h, r){
+      r = Math.min(r, w/2, h/2);
+      ctx.beginPath();
+      ctx.moveTo(x+r, y);
+      ctx.arcTo(x+w, y, x+w, y+h, r);
+      ctx.arcTo(x+w, y+h, x, y+h, r);
+      ctx.arcTo(x, y+h, x, y, r);
+      ctx.arcTo(x, y, x+w, y, r);
+      ctx.closePath();
+    }
+
+    // show help by default on desktop
+    miniHelp.classList.add('show');
+  </script>
+</body>
+</html>
